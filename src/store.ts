@@ -113,7 +113,6 @@ const evalWithPrecedence = (tokens: (number | OpToken)[]): number | null => {
 const getLinearChain = (
   resultId: string,
   nodes: Record<string, GraphNode>,
-  edges: GraphEdge[],
   inputsMap: Map<string, Array<{ sourceId: string; operation?: Operation }>>
 ): GraphNode[] | null => {
   const chain: GraphNode[] = []
@@ -126,7 +125,7 @@ const getLinearChain = (
     if (!node) return null
     chain.push(node)
     if (node.type === 'origem') return chain.reverse()
-    const inputs = inputsMap.get(currentId) || []
+    const inputs: Array<{ sourceId: string; operation?: Operation }> = inputsMap.get(currentId) || []
     if (inputs.length !== 1) return null
     currentId = inputs[0].sourceId
   }
@@ -231,7 +230,7 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
       if (inputs.length > 0) {
         // Pipeline (whiteboard): resultado = valor do último nó. Calculadora: resultado = expressão com precedência.
         const usePrecedence = node.evalPrecedence === true
-        const chain = usePrecedence ? getLinearChain(nodeId, nodes, edges, inputsMap) : null
+        const chain = usePrecedence ? getLinearChain(nodeId, nodes, inputsMap) : null
         if (usePrecedence && chain && chain.length >= 1) {
           const tokens: (number | OpToken)[] = [chain[0].value ?? 0]
           for (let i = 1; i < chain.length; i++) {
