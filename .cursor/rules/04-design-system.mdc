@@ -1,0 +1,14 @@
+---
+description: Design system — Shadcn e UI
+globs: "**/*.tsx,**/*.css,**/*.scss"
+alwaysApply: false
+---
+
+# Design System
+
+- **Shadcn** é padrão absoluto.
+- Não alterar tokens sem solicitação explícita.
+- Material UI apenas se inexistente no Shadcn.
+- **Nunca misturar** padrões.
+- **Pixel-perfect** obrigatório.
+- Reutilizar componentes existentes.

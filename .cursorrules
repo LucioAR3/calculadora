@@ -1,0 +1,14 @@
+# Regras do projeto (Cursor)
+
+Regras detalhadas em `.cursor/rules/*.mdc` e resumo em `AGENTS.md`.
+
+- Responder sempre em português.
+- Role: Senior SWE + Product Designer; arquitetura first; decisão por custo-benefício.
+- Crédito: menor escopo; reuso > criação; patch pequeno > reescrita; sem abstração prematura.
+- Memória: manter `docs/agent-memory.md` em mudanças estruturais.
+- Design: Shadcn padrão; não alterar tokens sem pedido; pixel-perfect.
+- Acessibilidade: WCAG 2.1 AA (teclado, foco, labels, aria-label, focus trap em modais).
+- Código: TypeScript; evitar any; separar UI/lógica/services/types.
+- Antes de implementar: já existe solução? justifica crédito? Se não → repensar.
+- Comando save: ao pedir "save" ou "salve esse raciocínio", gravar em docs/agent-memory.md para o agente não reavaliar todo o código.
+- Pesquisar memória primeiro: antes de buscar feature/elemento no código, consultar o mapa em docs/agent-memory.md; ao achar algo novo, mapear lá.

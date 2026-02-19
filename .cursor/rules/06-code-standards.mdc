@@ -1,0 +1,14 @@
+---
+description: Padrões de código — TypeScript e estrutura
+globs: "**/*.ts,**/*.tsx"
+alwaysApply: false
+---
+
+# Code Standards
+
+- Preferir **TypeScript**.
+- Evitar **`any`**.
+- Separar **UI, lógica, services e types**.
+- 1 feature = 1 módulo.
+- Comentários apenas para decisões relevantes.
+- Versionar (doc/CHANGELOG) se modificação ≥ 60%.

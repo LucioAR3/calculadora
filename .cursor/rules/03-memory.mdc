@@ -1,0 +1,8 @@
+---
+description: Memória em docs/agent-memory.md — formato denso, só agente; atualizar conforme contexto
+alwaysApply: true
+---
+
+# Memory
+
+Manter `docs/agent-memory.md`. Formato denso para o agente (não para usuário). Conteúdo: mapa de localizações, decisões. Atualizar em mudanças estruturais ou ao mapear novo elemento (regra 09).

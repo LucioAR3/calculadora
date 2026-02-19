@@ -1,0 +1,8 @@
+---
+description: Consultar docs/agent-memory.md antes de buscar no código; atualizar mapa conforme contexto
+alwaysApply: true
+---
+
+# Memória primeiro
+
+Consultar `docs/agent-memory.md` (seção mapa) antes de buscar feature/elemento no código. Se achar no mapa → ir direto ao arquivo/símbolo. Se achar no código → acrescentar ao mapa (formato denso, 1 linha por entrada). Memória é recurso direto do agente; atualizar conforme contexto analisado.

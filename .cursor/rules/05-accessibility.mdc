@@ -1,0 +1,15 @@
+---
+description: Acessibilidade WCAG 2.1 AA
+globs: "**/*.tsx,**/*.jsx,**/*.html"
+alwaysApply: false
+---
+
+# Accessibility (WCAG 2.1 AA mínimo)
+
+- Contraste adequado.
+- Navegação por teclado obrigatória.
+- Foco visível.
+- Inputs com label e descrição de erro acessível.
+- Botões ícone com `aria-label`.
+- Modal com focus trap e ESC.
+- Uso correto de elementos semânticos.

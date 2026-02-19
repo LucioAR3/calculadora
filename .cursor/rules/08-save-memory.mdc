@@ -1,0 +1,8 @@
+---
+description: Comando "save" — salvar em docs/agent-memory.md (formato denso, só agente)
+alwaysApply: true
+---
+
+# Save
+
+Pedido de salvar → acrescentar em `docs/agent-memory.md`. Formato denso (linhas curtas, chave: path ou símbolos), otimizado para o agente. Não estrutura para usuário ler. Atualizar conforme contexto analisado.

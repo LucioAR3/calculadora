@@ -1,0 +1,16 @@
+---
+description: Otimização de créditos — menor escopo e reuso
+alwaysApply: true
+---
+
+# Credit Optimization
+
+- Trabalhar sempre no **menor escopo possível**.
+- **Nunca reprocessar** código não alterado.
+- Preferir:
+  - **Reuso** > criação
+  - **Extensão** > duplicação
+  - **Patch pequeno** > reescrita
+- Se a alteração for pequena, enviar apenas o trecho para substituição.
+- Evitar explicações longas e código especulativo.
+- **Não criar abstração prematura**.

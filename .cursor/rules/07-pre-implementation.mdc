@@ -1,0 +1,16 @@
+---
+description: Checklist antes de implementar
+alwaysApply: true
+---
+
+# Pre-Implementation Check
+
+Antes de implementar, verificar:
+
+1. **Já existe solução similar?**
+2. **Pode reaproveitar?**
+3. **Aumenta acoplamento?**
+4. **Aumenta complexidade?**
+5. **Justifica custo de crédito?**
+
+Se **não justificar** → repensar abordagem.
