@@ -16,7 +16,7 @@ export default function Calculator({ onClose }: Props) {
   const [showingResult, setShowingResult] = useState(false)
   const [hasEnteredValueForCurrentStep, setHasEnteredValueForCurrentStep] = useState(false)
   
-  const { addNode, updateNode, addEdge, addResultado, setFocusNodeId } = useStore()
+  const { addNode, updateNode, addEdge, addResultado, setFocusNodeId, getNextPositionFrom } = useStore()
 
   // Sincronização com teclado (não capturar se o foco estiver em input/editável)
   useEffect(() => {
@@ -145,10 +145,7 @@ export default function Calculator({ onClose }: Props) {
       updateNode(currentCardId, { value: parseFloat(display) || 0 })
     }
 
-    const newPos = {
-      x: sourceNode.position.x + 300,
-      y: sourceNode.position.y
-    }
+    const newPos = getNextPositionFrom(sourceNode.position)
     const newId = addNode('etapa', newPos)
     updateNode(newId, { operation, value: 0, title: 'Valor 2' })
     addEdge(currentCardId, newId, operation)

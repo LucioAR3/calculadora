@@ -26,6 +26,7 @@ interface State {
   getFormula: (resultNodeId: string) => string | null
   focusNodeId: string | null
   setFocusNodeId: (id: string | null) => void
+  getNextPositionFrom: (basePos: { x: number; y: number }) => { x: number; y: number }
 }
 
 let nodeId = 0
@@ -279,7 +280,7 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
   return result
 }
 
-// Calcula próxima posição sem sobreposição
+// Próxima posição: +300px X, +150px Y em relação ao anterior; evita sobreposição somando 150px em Y até achar espaço
 const getNextPosition = (
   nodes: Record<string, GraphNode>,
   basePos?: { x: number; y: number }
@@ -287,23 +288,17 @@ const getNextPosition = (
   if (!basePos) {
     return { x: 0, y: 0 }
   }
-  
   const OFFSET_X = 300
   const OFFSET_Y = 150
-  
-  let newPos = { x: basePos.x + OFFSET_X, y: basePos.y }
-  
+  const MARGIN_Y = 80
   const positions = Object.values(nodes).map(n => n.position)
-  const hasOverlap = (pos: { x: number; y: number }) => {
-    return positions.some(p => 
-      Math.abs(p.x - pos.x) < 100 && Math.abs(p.y - pos.y) < 100
-    )
+  const hasOverlap = (pos: { x: number; y: number }) =>
+    positions.some(p => Math.abs(p.x - pos.x) < 120 && Math.abs(p.y - pos.y) < MARGIN_Y)
+
+  let newPos = { x: basePos.x + OFFSET_X, y: basePos.y + OFFSET_Y }
+  while (hasOverlap(newPos)) {
+    newPos = { x: newPos.x, y: newPos.y + OFFSET_Y }
   }
-  
-  if (hasOverlap(newPos)) {
-    newPos = { x: basePos.x + OFFSET_X, y: basePos.y + OFFSET_Y }
-  }
-  
   return newPos
 }
 
@@ -315,6 +310,8 @@ export const useStore = create<State>((set, get) => ({
   focusNodeId: null,
 
   setFocusNodeId: (id) => set({ focusNodeId: id }),
+
+  getNextPositionFrom: (basePos) => getNextPosition(get().nodes, basePos),
 
   addNode: (type, pos) => {
     const id = `n${nodeId++}`

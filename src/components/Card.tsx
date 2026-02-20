@@ -6,7 +6,7 @@ import CustomHandle from './CustomHandle'
 
 export default function Card({ id, data }: NodeProps) {
   const node = data as unknown as GraphNode
-  const { updateNode, removeNode, values, addEtapa, addResultado, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode, getFormula, focusNodeId, setFocusNodeId } = useStore()
+  const { updateNode, removeNode, values, addEtapa, addResultado, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode, getFormula, focusNodeId, setFocusNodeId, getNextPositionFrom } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const [opMenuOpen, setOpMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -82,8 +82,7 @@ export default function Card({ id, data }: NodeProps) {
   }
 
   const handleAddOrigemLinked = () => {
-    const basePos = node.position
-    const newPos = { x: basePos.x + 300, y: basePos.y }
+    const newPos = getNextPositionFrom(node.position)
     const newId = addNode('origem', newPos)
     addEdge(id, newId)
     setMenuOpen(false)
