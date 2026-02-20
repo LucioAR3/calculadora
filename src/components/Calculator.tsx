@@ -6,12 +6,6 @@ interface Props {
   onClose: () => void
 }
 
-interface HistoryItem {
-  expression: string
-  result: number
-  timestamp: number
-}
-
 export default function Calculator({ onClose }: Props) {
   const [display, setDisplay] = useState('0')
   const [currentCardId, setCurrentCardId] = useState<string | null>(null)
@@ -19,10 +13,10 @@ export default function Calculator({ onClose }: Props) {
   const [waitingSecondValue, setWaitingSecondValue] = useState(false)
   const [firstValue, setFirstValue] = useState<number | null>(null)
   const [calculationDisplay, setCalculationDisplay] = useState('')
-  const [history, setHistory] = useState<HistoryItem[]>([])
   const [showingResult, setShowingResult] = useState(false)
+  const [hasEnteredValueForCurrentStep, setHasEnteredValueForCurrentStep] = useState(false)
   
-  const { addNode, updateNode, addEdge, addResultado, values } = useStore()
+  const { addNode, updateNode, addEdge, addResultado, setFocusNodeId } = useStore()
 
   // Sincronização com teclado (não capturar se o foco estiver em input/editável)
   useEffect(() => {
@@ -103,9 +97,11 @@ export default function Calculator({ onClose }: Props) {
       setCurrentCardId(id)
       setFirstValue(value)
       setCalculationDisplay(digit)
+      setHasEnteredValueForCurrentStep(true)
       return
     }
     
+    if (waitingSecondValue) setHasEnteredValueForCurrentStep(true)
     const newDisplay = display === '0' ? digit : display + digit
     setDisplay(newDisplay)
     
@@ -132,76 +128,54 @@ export default function Calculator({ onClose }: Props) {
 
   const handleOperator = (op: '+' | '-' | '*' | '/') => {
     if (!currentCardId) return
-    
+    if (waitingSecondValue && !hasEnteredValueForCurrentStep) return
+
     const opMap: Record<string, Operation> = {
       '+': '+',
       '-': '-',
       '*': '×',
       '/': '÷'
     }
-    
     const operation = opMap[op]
-    
-    // Cria card Etapa linkado ao card atual
     const { nodes } = useStore.getState()
     const sourceNode = nodes[currentCardId]
-    
-    if (sourceNode) {
-      const newPos = { 
-        x: sourceNode.position.x + 300, 
-        y: sourceNode.position.y 
-      }
-      
-      const newId = addNode('etapa', newPos)
-      updateNode(newId, { 
-        operation, 
-        value: 0,
-        title: 'Valor 2'
-      })
-      
-      addEdge(currentCardId, newId, operation)
-      
-      setCurrentCardId(newId)
-      setOperator(operation)
-      setDisplay('0')
-      setWaitingSecondValue(true)
-      setCalculationDisplay(`${firstValue} ${operation}`)
+    if (!sourceNode) return
+
+    if (waitingSecondValue) {
+      updateNode(currentCardId, { value: parseFloat(display) || 0 })
     }
+
+    const newPos = {
+      x: sourceNode.position.x + 300,
+      y: sourceNode.position.y
+    }
+    const newId = addNode('etapa', newPos)
+    updateNode(newId, { operation, value: 0, title: 'Valor 2' })
+    addEdge(currentCardId, newId, operation)
+
+    setCurrentCardId(newId)
+    setOperator(operation)
+    setDisplay('0')
+    setWaitingSecondValue(true)
+    setHasEnteredValueForCurrentStep(false)
+    setFirstValue(waitingSecondValue ? (parseFloat(display) || 0) : (firstValue ?? 0))
+    setCalculationDisplay(
+      waitingSecondValue
+        ? `${calculationDisplay} ${display} ${operation}`
+        : `${firstValue} ${operation}`
+    )
+    setFocusNodeId(newId)
   }
 
   const handleEquals = () => {
-    if (!currentCardId || !operator) return
-    
-    // Cria card Resultado
+    if (!currentCardId || !operator || showingResult) return
+    if (waitingSecondValue) {
+      updateNode(currentCardId, { value: parseFloat(display) || 0 })
+    }
+
     addResultado(currentCardId, { evalPrecedence: true })
-    
-    // Aguarda cálculo e mostra resultado
-    setTimeout(() => {
-      const { nodes } = useStore.getState()
-      const resultNode = Object.values(nodes).find(n => 
-        n.type === 'resultado' && 
-        useStore.getState().edges.some(e => e.sourceId === currentCardId && e.targetId === n.id)
-      )
-      
-      if (resultNode) {
-        const result = values[resultNode.id]
-        const fullExpression = `${calculationDisplay} = ${result ?? '?'}`
-        
-        // Mostra resultado completo no display principal
-        setDisplay(fullExpression)
-        setCalculationDisplay('')
-        setShowingResult(true)
-        
-        // Adiciona ao histórico
-        if (result !== null && result !== undefined) {
-          setHistory(prev => [...prev, {
-            expression: fullExpression,
-            result,
-            timestamp: Date.now()
-          }])
-        }
-      }
-    }, 100)
+    setShowingResult(true)
+    setCalculationDisplay('')
   }
 
   const handleClear = () => {
@@ -212,11 +186,13 @@ export default function Calculator({ onClose }: Props) {
     setFirstValue(null)
     setCalculationDisplay('')
     setShowingResult(false)
+    setHasEnteredValueForCurrentStep(false)
   }
 
   const handleDecimal = () => {
     if (!display.includes('.')) {
       setDisplay(prev => prev + '.')
+      if (waitingSecondValue) setHasEnteredValueForCurrentStep(true)
     }
   }
 
@@ -278,71 +254,6 @@ export default function Calculator({ onClose }: Props) {
         </button>
       </div>
 
-      {/* Histórico */}
-      {history.length > 0 && (
-        <div style={{
-          marginBottom: 12,
-          maxHeight: 120,
-          overflowY: 'auto',
-          background: '#f8fafc',
-          borderRadius: 8,
-          padding: 8,
-          border: '1px solid #e2e8f0',
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 8,
-            paddingBottom: 6,
-            borderBottom: '1px solid #e2e8f0',
-          }}>
-            <span style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#64748b',
-              textTransform: 'uppercase',
-            }}>
-              Histórico
-            </span>
-            <button
-              onClick={() => setHistory([])}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#ef4444',
-                cursor: 'pointer',
-                fontSize: 10,
-                fontWeight: 600,
-                padding: '2px 6px',
-                borderRadius: 4,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#fee2e2'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-            >
-              Limpar
-            </button>
-          </div>
-          {history.map((item, index) => (
-            <div
-              key={item.timestamp}
-              style={{
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: '#475569',
-                padding: '4px 0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderBottom: index < history.length - 1 ? '1px solid #e2e8f0' : 'none',
-              }}
-            >
-              <span>{item.expression}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Status Indicator */}
       {currentCardId && (
         <div style={{
@@ -358,41 +269,10 @@ export default function Calculator({ onClose }: Props) {
         </div>
       )}
 
-      {/* Calculation Display (expressão) - só mostra se não está mostrando resultado */}
-      {calculationDisplay && !showingResult && (
-        <div style={{
-          fontSize: 13,
-          color: '#64748b',
-          marginBottom: 6,
-          textAlign: 'right',
-          fontFamily: 'monospace',
-          minHeight: 20,
-        }}>
-          {calculationDisplay}
-        </div>
-      )}
-
-      {/* Display (valor atual ou resultado completo) */}
-      <div style={{
-        background: '#f8fafc',
-        padding: '16px 12px',
-        borderRadius: 8,
-        marginBottom: 12,
-        fontSize: showingResult ? 20 : 28,
-        fontWeight: 'bold',
-        textAlign: 'right',
-        fontFamily: 'monospace',
-        color: showingResult ? '#22c55e' : '#1e293b',
-        minHeight: 50,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        border: '1px solid #e2e8f0',
-      }}>
-        {display}
-      </div>
-
       {/* Buttons */}
+      {(() => {
+        const opEnabled = currentCardId && !showingResult && (!waitingSecondValue || hasEnteredValueForCurrentStep)
+        return (
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
@@ -416,32 +296,32 @@ export default function Calculator({ onClose }: Props) {
         </button>
         <button
           onClick={() => handleOperator('/')}
-          disabled={!currentCardId || waitingSecondValue}
+          disabled={!opEnabled}
           style={{
             padding: 12,
             border: 'none',
             borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,
-            cursor: currentCardId && !waitingSecondValue ? 'pointer' : 'not-allowed',
-            background: currentCardId && !waitingSecondValue ? '#fed7aa' : '#f1f5f9',
-            color: currentCardId && !waitingSecondValue ? '#f97316' : '#cbd5e1',
+            cursor: opEnabled ? 'pointer' : 'not-allowed',
+            background: opEnabled ? '#fed7aa' : '#f1f5f9',
+            color: opEnabled ? '#f97316' : '#cbd5e1',
           }}
         >
           ÷
         </button>
         <button
           onClick={() => handleOperator('*')}
-          disabled={!currentCardId || waitingSecondValue}
+          disabled={!opEnabled}
           style={{
             padding: 12,
             border: 'none',
             borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,
-            cursor: currentCardId && !waitingSecondValue ? 'pointer' : 'not-allowed',
-            background: currentCardId && !waitingSecondValue ? '#dbeafe' : '#f1f5f9',
-            color: currentCardId && !waitingSecondValue ? '#3b82f6' : '#cbd5e1',
+            cursor: opEnabled ? 'pointer' : 'not-allowed',
+            background: opEnabled ? '#dbeafe' : '#f1f5f9',
+            color: opEnabled ? '#3b82f6' : '#cbd5e1',
           }}
         >
           ×
@@ -467,16 +347,16 @@ export default function Calculator({ onClose }: Props) {
         ))}
         <button
           onClick={() => handleOperator('-')}
-          disabled={!currentCardId || waitingSecondValue}
+          disabled={!opEnabled}
           style={{
             padding: 12,
             border: 'none',
             borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,
-            cursor: currentCardId && !waitingSecondValue ? 'pointer' : 'not-allowed',
-            background: currentCardId && !waitingSecondValue ? '#fee2e2' : '#f1f5f9',
-            color: currentCardId && !waitingSecondValue ? '#ef4444' : '#cbd5e1',
+            cursor: opEnabled ? 'pointer' : 'not-allowed',
+            background: opEnabled ? '#fee2e2' : '#f1f5f9',
+            color: opEnabled ? '#ef4444' : '#cbd5e1',
           }}
         >
           −
@@ -502,16 +382,16 @@ export default function Calculator({ onClose }: Props) {
         ))}
         <button
           onClick={() => handleOperator('+')}
-          disabled={!currentCardId || waitingSecondValue}
+          disabled={!opEnabled}
           style={{
             padding: 12,
             border: 'none',
             borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,
-            cursor: currentCardId && !waitingSecondValue ? 'pointer' : 'not-allowed',
-            background: currentCardId && !waitingSecondValue ? '#dcfce7' : '#f1f5f9',
-            color: currentCardId && !waitingSecondValue ? '#22c55e' : '#cbd5e1',
+            cursor: opEnabled ? 'pointer' : 'not-allowed',
+            background: opEnabled ? '#dcfce7' : '#f1f5f9',
+            color: opEnabled ? '#22c55e' : '#cbd5e1',
           }}
         >
           +
@@ -537,16 +417,16 @@ export default function Calculator({ onClose }: Props) {
         ))}
         <button
           onClick={handleEquals}
-          disabled={!currentCardId || !operator || !waitingSecondValue}
+          disabled={!currentCardId || !operator || !waitingSecondValue || showingResult || !hasEnteredValueForCurrentStep}
           style={{
             padding: 12,
             border: 'none',
             borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,
-            cursor: currentCardId && operator && waitingSecondValue ? 'pointer' : 'not-allowed',
-            background: currentCardId && operator && waitingSecondValue ? '#22c55e' : '#f1f5f9',
-            color: currentCardId && operator && waitingSecondValue ? '#ffffff' : '#cbd5e1',
+            cursor: currentCardId && operator && waitingSecondValue && !showingResult && hasEnteredValueForCurrentStep ? 'pointer' : 'not-allowed',
+            background: currentCardId && operator && waitingSecondValue && !showingResult && hasEnteredValueForCurrentStep ? '#22c55e' : '#f1f5f9',
+            color: currentCardId && operator && waitingSecondValue && !showingResult && hasEnteredValueForCurrentStep ? '#ffffff' : '#cbd5e1',
             gridRow: 'span 2',
           }}
         >
@@ -585,6 +465,8 @@ export default function Calculator({ onClose }: Props) {
           .
         </button>
       </div>
+        )
+      })()}
     </div>
   )
 }

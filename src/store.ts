@@ -23,6 +23,9 @@ interface State {
   calc: () => void
   loadFlow: (data: { nodes: Record<string, GraphNode>; edges: GraphEdge[] }) => void
   duplicateNode: (nodeId: string) => string | null
+  getFormula: (resultNodeId: string) => string | null
+  focusNodeId: string | null
+  setFocusNodeId: (id: string | null) => void
 }
 
 let nodeId = 0
@@ -125,6 +128,30 @@ const getLinearChain = (
     if (!node) return null
     chain.push(node)
     if (node.type === 'origem') return chain.reverse()
+    const inputs: Array<{ sourceId: string; operation?: Operation }> = inputsMap.get(currentId) || []
+    if (inputs.length !== 1) return null
+    currentId = inputs[0].sourceId
+  }
+  return null
+}
+
+// Cadeia para exibir fórmula: para em outro resultado (não expande subcálculo)
+const getFormulaChain = (
+  resultId: string,
+  nodes: Record<string, GraphNode>,
+  inputsMap: Map<string, Array<{ sourceId: string; operation?: Operation }>>
+): GraphNode[] | null => {
+  const chain: GraphNode[] = []
+  let currentId: string | null = resultId
+  const visited = new Set<string>()
+  while (currentId) {
+    if (visited.has(currentId)) return null
+    visited.add(currentId)
+    const node = nodes[currentId]
+    if (!node) return null
+    chain.push(node)
+    if (node.type === 'origem') return chain.reverse()
+    if (node.type === 'resultado' && node.id !== resultId) return chain.reverse()
     const inputs: Array<{ sourceId: string; operation?: Operation }> = inputsMap.get(currentId) || []
     if (inputs.length !== 1) return null
     currentId = inputs[0].sourceId
@@ -285,6 +312,9 @@ export const useStore = create<State>((set, get) => ({
   edges: [],
   values: {},
   confirmModal: null,
+  focusNodeId: null,
+
+  setFocusNodeId: (id) => set({ focusNodeId: id }),
 
   addNode: (type, pos) => {
     const id = `n${nodeId++}`
@@ -521,5 +551,48 @@ export const useStore = create<State>((set, get) => ({
       ...(source.evalPrecedence != null && { evalPrecedence: source.evalPrecedence }),
     })
     return newId
+  },
+
+  getFormula: (resultNodeId) => {
+    const { nodes, edges } = get()
+    const node = nodes[resultNodeId]
+    if (!node || node.type !== 'resultado') return null
+    const inputsMap = new Map<string, Array<{ sourceId: string; operation?: Operation }>>()
+    edges.forEach(e => {
+      if (!inputsMap.has(e.targetId)) inputsMap.set(e.targetId, [])
+      inputsMap.get(e.targetId)!.push({ sourceId: e.sourceId, operation: e.operation })
+    })
+    const chain = getFormulaChain(resultNodeId, nodes, inputsMap)
+    if (!chain || chain.length === 0) return null
+    const withoutResult = chain.slice(0, -1)
+    if (withoutResult.length === 0) return null
+    const ids = withoutResult.map(n => n.id)
+    const ops: (Operation | undefined)[] = []
+    for (let i = 1; i < withoutResult.length; i++) {
+      const n = withoutResult[i]
+      ops.push(n.type === 'etapa' ? n.operation : undefined)
+    }
+    const hasAddSub = ops.some(o => o === '+' || o === '-')
+    const hasMulDiv = ops.some(o => o === '×' || o === '÷')
+    const needParens = hasAddSub && hasMulDiv
+    const isMulDiv = (o: Operation | undefined) => o === '×' || o === '÷'
+    const runs: { startIdIdx: number; endIdIdx: number }[] = []
+    for (let i = 0; i < ops.length; i++) {
+      if (!isMulDiv(ops[i])) continue
+      const startIdIdx = i
+      while (i < ops.length && isMulDiv(ops[i])) i++
+      runs.push({ startIdIdx, endIdIdx: i })
+      i--
+    }
+    const openParenAt = (idIdx: number) => needParens && runs.some(r => r.startIdIdx === idIdx)
+    const closeParenAfter = (idIdx: number) => needParens && runs.some(r => r.endIdIdx === idIdx)
+    const parts: string[] = []
+    for (let i = 0; i < ids.length; i++) {
+      if (openParenAt(i)) parts.push('(')
+      parts.push(ids[i])
+      if (closeParenAfter(i)) parts.push(')')
+      if (i < ops.length && ops[i]) parts.push(' ', ops[i]!, ' ')
+    }
+    return parts.join('').replace(/\s+/g, ' ').trim()
   },
 }))

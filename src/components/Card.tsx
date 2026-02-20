@@ -6,12 +6,19 @@ import CustomHandle from './CustomHandle'
 
 export default function Card({ id, data }: NodeProps) {
   const node = data as unknown as GraphNode
-  const { updateNode, removeNode, values, addEtapa, addResultado, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode } = useStore()
+  const { updateNode, removeNode, values, addEtapa, addResultado, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode, getFormula, focusNodeId, setFocusNodeId } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const [opMenuOpen, setOpMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [inputWidth, setInputWidth] = useState(80)
+
+  useEffect(() => {
+    if (focusNodeId === id && (node.type === 'origem' || node.type === 'etapa')) {
+      inputRef.current?.focus()
+      setFocusNodeId(null)
+    }
+  }, [focusNodeId, id, node.type, setFocusNodeId])
 
   // Calcula largura do input baseado no valor
   useEffect(() => {
@@ -67,6 +74,7 @@ export default function Card({ id, data }: NodeProps) {
   const displayValue = node.type === 'resultado' 
     ? (values[id] ?? '—') 
     : (values[id] ?? node.value ?? 0)
+  const resultFormula = node.type === 'resultado' ? getFormula(id) : null
 
   const handleOperationSelect = (op: Operation) => {
     updateNode(id, { operation: op })
@@ -432,14 +440,25 @@ export default function Card({ id, data }: NodeProps) {
             }}
           />
         ) : (
-          <div style={{
-            fontSize: 28,
-            fontWeight: 'bold',
-            color: c.text,
-            textAlign: 'center',
-            padding: '10px 16px',
-          }}>
-            {displayValue}
+          <div style={{ textAlign: 'center', padding: '10px 16px' }}>
+            {resultFormula && (
+              <div style={{
+                fontSize: 11,
+                color: '#64748b',
+                fontFamily: 'monospace',
+                marginBottom: 4,
+                fontWeight: 400,
+              }}>
+                {resultFormula}
+              </div>
+            )}
+            <div style={{
+              fontSize: 28,
+              fontWeight: 'bold',
+              color: c.text,
+            }}>
+              {displayValue}
+            </div>
           </div>
         )}
       </div>
