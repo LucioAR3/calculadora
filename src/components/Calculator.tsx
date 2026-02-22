@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useStore } from '../store'
+import { useStore, getStageOrderMap } from '../store'
 import type { Operation } from '../types'
 
 interface Props {
@@ -147,8 +147,11 @@ export default function Calculator({ onClose }: Props) {
 
     const newPos = getNextPositionFrom(sourceNode.position)
     const newId = addNode('etapa', newPos)
-    updateNode(newId, { operation, value: 0, title: 'Valor 2' })
     addEdge(currentCardId, newId, operation)
+    const state = useStore.getState()
+    const orderMap = getStageOrderMap(state.nodes, state.edges)
+    const ordem = orderMap[newId] ?? 1
+    updateNode(newId, { operation, value: 0, title: `Valor ${ordem + 1}` })
 
     setCurrentCardId(newId)
     setOperator(operation)

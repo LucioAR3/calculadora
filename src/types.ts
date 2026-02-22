@@ -10,6 +10,8 @@ export interface GraphNode {
   position: { x: number; y: number }
   /** Quando true (apenas cálculo da calculadora), resultado = expressão com precedência; senão = valor do último nó (pipeline) */
   evalPrecedence?: boolean
+  /** Etapa: quando true, N origens → N resultados (cada origem aplica op+valor independente) */
+  isMultiple?: boolean
 }
 
 export interface GraphEdge {
@@ -17,4 +19,6 @@ export interface GraphEdge {
   sourceId: string
   targetId: string
   operation?: Operation
+  /** Em etapa múltipla: identifica qual origem (sourceId) alimenta este output */
+  flowId?: string
 }

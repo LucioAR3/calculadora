@@ -1,0 +1,34 @@
+{
+  "projectName": "Dívida 12 meses – juros e multa fixa",
+  "nodes": {
+    "n0": { "id": "n0", "type": "origem", "value": 1000, "title": "Empréstimo (R$)", "position": { "x": 0, "y": 0 } },
+    "n1": { "id": "n1", "type": "origem", "value": 1, "title": "Prazo (anos)", "position": { "x": 0, "y": 70 } },
+    "n2": { "id": "n2", "type": "origem", "value": 12, "title": "Meses no ano", "position": { "x": 0, "y": 140 } },
+    "n3": { "id": "n3", "type": "origem", "value": 1.5, "title": "Juros % mensal", "position": { "x": 0, "y": 210 } },
+    "n4": { "id": "n4", "type": "origem", "value": 1, "title": "Multa % (sobre principal)", "position": { "x": 0, "y": 280 } },
+    "n5": { "id": "n5", "type": "etapa", "value": null, "operation": "×", "title": "Parcelas (meses)", "position": { "x": 220, "y": 105 } },
+    "n6": { "id": "n6", "type": "etapa", "value": 100, "operation": "÷", "title": "Taxa decimal", "position": { "x": 220, "y": 245 }, "isMultiple": true },
+    "n7": { "id": "n7", "type": "resultado", "value": null, "title": "Taxa juros (decimal)", "position": { "x": 440, "y": 210 } },
+    "n8": { "id": "n8", "type": "resultado", "value": null, "title": "Taxa multa (decimal)", "position": { "x": 440, "y": 280 } },
+    "n9": { "id": "n9", "type": "etapa", "value": null, "operation": "×", "title": "Juros por mês (R$)", "position": { "x": 440, "y": 70 } },
+    "n10": { "id": "n10", "type": "etapa", "value": null, "operation": "×", "title": "Multa fixa por parcela atrasada (R$)", "position": { "x": 440, "y": 350 } },
+    "n11": { "id": "n11", "type": "etapa", "value": null, "operation": "×", "title": "Total juros (R$)", "position": { "x": 660, "y": 70 } },
+    "n12": { "id": "n12", "type": "etapa", "value": 0, "operation": "+", "title": "Dívida total (R$)", "position": { "x": 660, "y": 200 } }
+  },
+  "edges": [
+    { "id": "e0", "sourceId": "n1", "targetId": "n5", "operation": "×" },
+    { "id": "e1", "sourceId": "n2", "targetId": "n5", "operation": "×" },
+    { "id": "e2", "sourceId": "n3", "targetId": "n6", "operation": "÷" },
+    { "id": "e3", "sourceId": "n4", "targetId": "n6", "operation": "÷" },
+    { "id": "e4", "sourceId": "n6", "targetId": "n7", "operation": "÷", "flowId": "n3" },
+    { "id": "e5", "sourceId": "n6", "targetId": "n8", "operation": "÷", "flowId": "n4" },
+    { "id": "e6", "sourceId": "n0", "targetId": "n9", "operation": "×" },
+    { "id": "e7", "sourceId": "n7", "targetId": "n9", "operation": "×" },
+    { "id": "e8", "sourceId": "n0", "targetId": "n10", "operation": "×" },
+    { "id": "e9", "sourceId": "n8", "targetId": "n10", "operation": "×" },
+    { "id": "e10", "sourceId": "n9", "targetId": "n11", "operation": "×" },
+    { "id": "e11", "sourceId": "n5", "targetId": "n11", "operation": "×" },
+    { "id": "e12", "sourceId": "n0", "targetId": "n12", "operation": "+" },
+    { "id": "e13", "sourceId": "n11", "targetId": "n12", "operation": "+" }
+  ]
+}

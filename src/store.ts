@@ -20,6 +20,7 @@ interface State {
   closeConfirmModal: () => void
   addEtapa: (sourceId: string, operation: Operation) => void
   addResultado: (sourceId: string, options?: { evalPrecedence?: boolean }) => void
+  addOrigemFromResult: (sourceId: string) => void
   calc: () => void
   loadFlow: (data: { nodes: Record<string, GraphNode>; edges: GraphEdge[] }) => void
   duplicateNode: (nodeId: string) => string | null
@@ -73,11 +74,11 @@ const hasCycle = (edges: GraphEdge[], newSrc: string, newTgt: string): boolean =
   return false
 }
 
-// Precedência científica: × e ÷ antes de + e −
+// Precedência científica: × e ÷ antes de + e − (exportada para testes)
 const PRECEDENCE = { '+': 0, '-': 0, '×': 1, '÷': 1 } as const
-type OpToken = '+' | '-' | '×' | '÷'
+export type OpToken = '+' | '-' | '×' | '÷'
 
-const evalWithPrecedence = (tokens: (number | OpToken)[]): number | null => {
+export const evalWithPrecedence = (tokens: (number | OpToken)[]): number | null => {
   if (tokens.length === 0) return null
   if (tokens.length === 1) return typeof tokens[0] === 'number' ? tokens[0] : null
 
@@ -196,6 +197,32 @@ const topoSort = (nodes: Record<string, GraphNode>, edges: GraphEdge[]): string[
   return result
 }
 
+/** Ordem da etapa no fluxo: origem = 0; etapa/resultado = 1 + max(ordem das entradas). 1ª etapa = só origens; 2ª = recebe da 1ª; etc. */
+export const getStageOrderMap = (
+  nodes: Record<string, GraphNode>,
+  edges: GraphEdge[]
+): Record<string, number> => {
+  const order = topoSort(nodes, edges)
+  const inputsMap = new Map<string, string[]>()
+  edges.forEach(e => {
+    if (!inputsMap.has(e.targetId)) inputsMap.set(e.targetId, [])
+    inputsMap.get(e.targetId)!.push(e.sourceId)
+  })
+  const depth: Record<string, number> = {}
+  order.forEach(nodeId => {
+    const node = nodes[nodeId]
+    if (!node) return
+    if (node.type === 'origem') {
+      depth[nodeId] = 0
+      return
+    }
+    const sources = inputsMap.get(nodeId) || []
+    const maxInput = sources.length === 0 ? -1 : Math.max(...sources.map(s => depth[s] ?? 0))
+    depth[nodeId] = maxInput + 1
+  })
+  return depth
+}
+
 // Calcula valores do grafo
 const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
   const result: Record<string, number | null> = {}
@@ -219,57 +246,70 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
       if (inputs.length === 0) {
         result[nodeId] = node.value ?? 0
       } else {
-        let sum = 0
-        inputs.forEach(inp => {
-          const val = result[inp.sourceId]
-          if (val !== null && val !== undefined) {
-            sum += val
-          }
-        })
-        result[nodeId] = sum
+        const vals = inputs.map(inp => result[inp.sourceId]).filter((v): v is number => v !== null && v !== undefined)
+        result[nodeId] = vals.length === 1 ? vals[0] : vals.reduce((a, b) => a + b, 0)
       }
     } else if (node.type === 'etapa') {
       if (inputs.length >= 1) {
-        const input1 = result[inputs[0].sourceId]
-        const input2 = inputs.length >= 2 ? result[inputs[1].sourceId] : node.value
-        
-        if (input1 !== null && input2 !== null && node.operation) {
-          switch (node.operation) {
-            case '+':
-              result[nodeId] = input1 + input2
-              break
-            case '-':
-              result[nodeId] = input1 - input2
-              break
-            case '×':
-              result[nodeId] = input1 * input2
-              break
-            case '÷':
-              result[nodeId] = input2 !== 0 ? input1 / input2 : null
-              break
+        const applyOp = (a: number, op: Operation, b: number): number | null => {
+          switch (op) {
+            case '+': return a + b
+            case '-': return a - b
+            case '×': return a * b
+            case '÷': return b !== 0 ? a / b : null
+            default: return null
           }
+        }
+        const op = node.operation
+        const val = node.value ?? 0
+
+        if (node.isMultiple && inputs.length >= 2 && op) {
+          const outEdges = edges.filter(e => e.sourceId === nodeId).sort((a, b) => a.id.localeCompare(b.id))
+          const sortedInputs = [...inputs].sort((a, b) => a.sourceId.localeCompare(b.sourceId))
+          for (let i = 0; i < outEdges.length; i++) {
+            const originId = outEdges[i].flowId ?? sortedInputs[i]?.sourceId
+            const inputVal = originId != null ? result[originId] : null
+            if (inputVal !== null && inputVal !== undefined) {
+              const v = applyOp(inputVal, op, val)
+              if (v !== null && !Number.isNaN(v)) result[outEdges[i].targetId] = v
+            }
+          }
+          const firstInput = result[sortedInputs[0]?.sourceId]
+          result[nodeId] = firstInput != null ? applyOp(firstInput, op, val) : null
         } else {
-          result[nodeId] = null
+          const input1 = result[inputs[0].sourceId]
+          const input2 = inputs.length >= 2 ? result[inputs[1].sourceId] : node.value
+
+          if (input1 !== null && input2 !== null && op) {
+            result[nodeId] = applyOp(input1, op, input2)
+          } else {
+            result[nodeId] = null
+          }
         }
       } else {
         result[nodeId] = node.value ?? null
       }
     } else if (node.type === 'resultado') {
       if (inputs.length > 0) {
-        // Pipeline (whiteboard): resultado = valor do último nó. Calculadora: resultado = expressão com precedência.
-        const usePrecedence = node.evalPrecedence === true
-        const chain = usePrecedence ? getLinearChain(nodeId, nodes, inputsMap) : null
-        if (usePrecedence && chain && chain.length >= 1) {
-          const tokens: (number | OpToken)[] = [chain[0].value ?? 0]
-          for (let i = 1; i < chain.length; i++) {
-            const etapa = chain[i]
-            if (etapa.type === 'etapa' && etapa.operation) {
-              tokens.push(etapa.operation, etapa.value ?? 0)
-            }
-          }
-          result[nodeId] = tokens.length > 1 ? evalWithPrecedence(tokens) : (chain[0].value ?? null)
+        const sourceNode = nodes[inputs[0].sourceId]
+        const fromEtapaMultiple = sourceNode?.type === 'etapa' && sourceNode.isMultiple
+        if (fromEtapaMultiple) {
+          // Valor já atribuído no bloco da etapa por fluxo; não sobrescrever.
         } else {
-          result[nodeId] = result[inputs[0].sourceId] ?? null
+          const usePrecedence = node.evalPrecedence === true
+          const chain = usePrecedence ? getLinearChain(nodeId, nodes, inputsMap) : null
+          if (usePrecedence && chain && chain.length >= 1) {
+            const tokens: (number | OpToken)[] = [chain[0].value ?? 0]
+            for (let i = 1; i < chain.length; i++) {
+              const etapa = chain[i]
+              if (etapa.type === 'etapa' && etapa.operation) {
+                tokens.push(etapa.operation, etapa.value ?? 0)
+              }
+            }
+            result[nodeId] = tokens.length > 1 ? evalWithPrecedence(tokens) : (chain[0].value ?? null)
+          } else {
+            result[nodeId] = result[inputs[0].sourceId] ?? null
+          }
         }
       } else {
         result[nodeId] = null
@@ -352,35 +392,58 @@ export const useStore = create<State>((set, get) => ({
 
   addEdge: (src, tgt, operation) => {
     if (src === tgt) return
-    
+
     const { edges, nodes } = get()
-    
+
     if (hasCycle(edges, src, tgt)) {
       console.warn('Conexão bloqueada: criaria um ciclo')
       return
     }
-    
+
     if (edges.some(e => e.sourceId === src && e.targetId === tgt)) return
-    
+
+    const targetNodeForLimit = nodes[tgt]
     const targetInputs = edges.filter(e => e.targetId === tgt)
-    if (targetInputs.length >= 2) {
-      console.warn('Nó já tem 2 inputs (máximo)')
+    const maxInputs = targetNodeForLimit?.type === 'etapa' && targetNodeForLimit.isMultiple ? 9 : 2
+    if (targetInputs.length >= maxInputs) {
+      console.warn(maxInputs === 9 ? 'Etapa múltipla: máximo 9 origens' : 'Nó já tem 2 inputs (máximo)')
       return
     }
-    
+
+    const sourceNode = nodes[src]
+    const etapaMultiple = sourceNode?.type === 'etapa' && sourceNode.isMultiple
+    const etapaOutputs = edges.filter(e => e.sourceId === src)
+    const etapaInputs = edges.filter(e => e.targetId === src)
+    const maxOriginsMultiplo = 9
+    if (etapaMultiple && etapaInputs.length >= 2) {
+      const maxResults = Math.min(etapaInputs.length, maxOriginsMultiplo)
+      if (etapaOutputs.length >= maxResults) {
+        console.warn('Etapa múltipla: máximo de resultados = quantidade de origens (até 9)')
+        return
+      }
+    }
+
     const targetNode = nodes[tgt]
     let filtered = edges
     if (targetNode && targetNode.type === 'resultado') {
       filtered = edges.filter(e => e.targetId !== tgt)
     }
-    
+
+    let flowId: string | undefined
+    if (etapaMultiple && etapaInputs.length >= 2) {
+      const used = new Set(etapaOutputs.map(e => e.flowId).filter(Boolean))
+      const nextOrigin = etapaInputs.map(e => e.sourceId).sort().find(sid => !used.has(sid))
+      flowId = nextOrigin
+    }
+
     const newEdge: GraphEdge = {
       id: `e${edgeId++}`,
       sourceId: src,
       targetId: tgt,
-      operation
+      operation,
+      ...(flowId != null && { flowId }),
     }
-    
+
     set({ edges: [...filtered, newEdge] })
     get().calc()
   },
@@ -458,6 +521,19 @@ export const useStore = create<State>((set, get) => ({
     if (options?.evalPrecedence) {
       updateNode(newId, { evalPrecedence: true })
     }
+    addEdge(sourceId, newId)
+  },
+
+  /** A partir de um card Resultado, cria uma Origem ligada a ele (o resultado vira origem de um novo fluxo). A origem fica com o mesmo valor do resultado. */
+  addOrigemFromResult: (sourceId) => {
+    const { nodes, addNode, addEdge, updateNode } = get()
+    const sourceNode = nodes[sourceId]
+    if (!sourceNode || sourceNode.type !== 'resultado') return
+    const newPos = getNextPosition(nodes, sourceNode.position)
+    const newId = addNode('origem', newPos)
+    const val = get().values[sourceId]
+    const numVal = typeof val === 'number' && !Number.isNaN(val) ? val : 0
+    updateNode(newId, { value: numVal })
     addEdge(sourceId, newId)
   },
 
@@ -546,6 +622,7 @@ export const useStore = create<State>((set, get) => ({
       title: source.title,
       ...(source.operation != null && { operation: source.operation }),
       ...(source.evalPrecedence != null && { evalPrecedence: source.evalPrecedence }),
+      ...(source.isMultiple != null && { isMultiple: source.isMultiple }),
     })
     return newId
   },
@@ -554,6 +631,17 @@ export const useStore = create<State>((set, get) => ({
     const { nodes, edges } = get()
     const node = nodes[resultNodeId]
     if (!node || node.type !== 'resultado') return null
+    const inEdges = edges.filter(e => e.targetId === resultNodeId)
+    if (inEdges.length === 1) {
+      const etapaId = inEdges[0].sourceId
+      const etapa = nodes[etapaId]
+      const edge = inEdges[0]
+      if (etapa?.type === 'etapa' && etapa.isMultiple && etapa.operation) {
+        const originId = edge.flowId ?? etapaId
+        const val = etapa.value ?? 0
+        return `${originId} ${etapa.operation} ${val}`
+      }
+    }
     const inputsMap = new Map<string, Array<{ sourceId: string; operation?: Operation }>>()
     edges.forEach(e => {
       if (!inputsMap.has(e.targetId)) inputsMap.set(e.targetId, [])

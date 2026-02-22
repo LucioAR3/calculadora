@@ -8,8 +8,11 @@ interface Props {
 
 const ZOOM_LEVELS = [10, 25, 50, 75, 100, 150, 200, 300, 400]
 
+type AppMode = 'basico' | 'financeiro'
+
 export default function BottomToolbar({ onOpenCalc }: Props) {
   const [zoomOpen, setZoomOpen] = useState(false)
+  const [mode, setMode] = useState<AppMode>('basico')
   const zoomRef = useRef<HTMLDivElement>(null)
   const { addNode } = useStore()
   const { setViewport } = useReactFlow()
@@ -192,6 +195,63 @@ export default function BottomToolbar({ onOpenCalc }: Props) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Divider */}
+      <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
+
+      {/* Modo: Básico (verde) e Financeiro (lilás) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button
+          onClick={() => setMode('basico')}
+          title="Modo básico"
+          style={{
+            padding: 8,
+            borderRadius: 8,
+            border: 'none',
+            cursor: 'pointer',
+            background: mode === 'basico' ? 'rgba(34, 197, 94, 0.2)' : 'none',
+            color: mode === 'basico' ? '#16a34a' : '#22c55e',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            fontSize: 18,
+            fontWeight: 500,
+            fontFamily: 'system-ui, sans-serif',
+          }}
+          onMouseEnter={(e) => {
+            if (mode !== 'basico') e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)'
+          }}
+          onMouseLeave={(e) => {
+            if (mode !== 'basico') e.currentTarget.style.background = 'none'
+          }}
+        >
+          α
+        </button>
+        <span title="Modo financeiro">
+        <button
+          disabled
+          style={{
+            padding: 8,
+            borderRadius: 8,
+            border: 'none',
+            cursor: 'default',
+            background: 'none',
+            color: '#a855f7',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            fontSize: 18,
+            fontWeight: 700,
+            fontFamily: 'system-ui, sans-serif',
+            opacity: 0.6,
+          }}
+        >
+          π
+        </button>
+        </span>
       </div>
     </div>
   )

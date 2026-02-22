@@ -34,4 +34,3 @@ lerna-debug.log*
 *.bat
 *.txt
 !README.md
-!FEATURE-*.md

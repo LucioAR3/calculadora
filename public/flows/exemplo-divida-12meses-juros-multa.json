@@ -1,0 +1,27 @@
+{
+  "projectName": "Dívida 12 meses – juros 1,5% a.m. e multa 1% por atraso",
+  "nodes": {
+    "n0": { "id": "n0", "type": "origem", "value": 1000, "title": "Empréstimo (R$)", "position": { "x": 0, "y": 0 } },
+    "n1": { "id": "n1", "type": "origem", "value": 12, "title": "Parcelas (meses)", "position": { "x": 0, "y": 80 } },
+    "n2": { "id": "n2", "type": "origem", "value": 1.5, "title": "Juros % mensal", "position": { "x": 0, "y": 160 } },
+    "n3": { "id": "n3", "type": "origem", "value": 1, "title": "Multa % atraso", "position": { "x": 0, "y": 240 } },
+    "n4": { "id": "n4", "type": "etapa", "value": 100, "operation": "÷", "title": "Taxa decimal juros", "position": { "x": 240, "y": 160 } },
+    "n5": { "id": "n5", "type": "etapa", "value": null, "operation": "×", "title": "Juros por mês (R$)", "position": { "x": 240, "y": 80 } },
+    "n6": { "id": "n6", "type": "etapa", "value": null, "operation": "×", "title": "Total juros 12 meses", "position": { "x": 480, "y": 80 } },
+    "n7": { "id": "n7", "type": "etapa", "value": 100, "operation": "÷", "title": "Taxa decimal multa", "position": { "x": 240, "y": 240 } },
+    "n8": { "id": "n8", "type": "etapa", "value": null, "operation": "×", "title": "Multa por parcela atrasada (R$)", "position": { "x": 240, "y": 320 } },
+    "n9": { "id": "n9", "type": "etapa", "value": 0, "operation": "+", "title": "Dívida total (empréstimo + juros)", "position": { "x": 480, "y": 200 } }
+  },
+  "edges": [
+    { "id": "e0", "sourceId": "n2", "targetId": "n4", "operation": "÷" },
+    { "id": "e1", "sourceId": "n0", "targetId": "n5", "operation": "×" },
+    { "id": "e2", "sourceId": "n4", "targetId": "n5", "operation": "×" },
+    { "id": "e3", "sourceId": "n5", "targetId": "n6", "operation": "×" },
+    { "id": "e4", "sourceId": "n1", "targetId": "n6", "operation": "×" },
+    { "id": "e5", "sourceId": "n3", "targetId": "n7", "operation": "÷" },
+    { "id": "e6", "sourceId": "n0", "targetId": "n8", "operation": "×" },
+    { "id": "e7", "sourceId": "n7", "targetId": "n8", "operation": "×" },
+    { "id": "e8", "sourceId": "n0", "targetId": "n9", "operation": "+" },
+    { "id": "e9", "sourceId": "n6", "targetId": "n9", "operation": "+" }
+  ]
+}

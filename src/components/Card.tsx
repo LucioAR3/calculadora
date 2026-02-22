@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Position, type NodeProps } from '@xyflow/react'
-import { useStore } from '../store'
+import { useStore, getStageOrderMap } from '../store'
 import type { GraphNode, Operation } from '../types'
 import CustomHandle from './CustomHandle'
 
 export default function Card({ id, data }: NodeProps) {
-  const node = data as unknown as GraphNode
-  const { updateNode, removeNode, values, addEtapa, addResultado, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode, getFormula, focusNodeId, setFocusNodeId, getNextPositionFrom } = useStore()
+  const dataNode = data as unknown as GraphNode
+  const node = useStore(s => s.nodes[id] ?? dataNode) as GraphNode
+  const { updateNode, removeNode, values, addEtapa, addResultado, addOrigemFromResult, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode, getFormula, focusNodeId, setFocusNodeId, getNextPositionFrom } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const [opMenuOpen, setOpMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -76,6 +77,19 @@ export default function Card({ id, data }: NodeProps) {
     : (values[id] ?? node.value ?? 0)
   const resultFormula = node.type === 'resultado' ? getFormula(id) : null
 
+  const inputEdges = edges.filter(e => e.targetId === id)
+  const outputEdges = edges.filter(e => e.sourceId === id)
+  const hasTwoInputs = inputEdges.length >= 2
+  const secondSourceId = hasTwoInputs ? inputEdges[1].sourceId : null
+  const secondOperandDisplay = hasTwoInputs && secondSourceId != null ? (values[secondSourceId] ?? '—') : null
+  const isEtapaMultiple = node.type === 'etapa' && !!node.isMultiple
+  const maxOriginsMultiplo = 9
+  const canAddMoreResults = !isEtapaMultiple || outputEdges.length < Math.min(inputEdges.length, maxOriginsMultiplo)
+
+  const nodes = useStore(s => s.nodes)
+  const stageOrderMap = useMemo(() => getStageOrderMap(nodes, edges), [nodes, edges])
+  const stageOrder = node.type === 'etapa' ? (stageOrderMap[id] ?? 0) : 0
+
   const handleOperationSelect = (op: Operation) => {
     updateNode(id, { operation: op })
     setOpMenuOpen(false)
@@ -92,7 +106,7 @@ export default function Card({ id, data }: NodeProps) {
     <div style={{
       minWidth: node.type === 'resultado' ? 220 : inputWidth + 80,
       background: c.bg,
-      border: `1px solid ${c.border}`,
+      border: isEtapaMultiple ? `2px dashed ${c.border}` : `1px solid ${c.border}`,
       borderRadius: 12,
       padding: 16,
       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
@@ -330,14 +344,51 @@ export default function Card({ id, data }: NodeProps) {
 
       {node.type === 'etapa' && (
         <div style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: '#64748b',
-          letterSpacing: '0.5px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           marginBottom: 8,
-          textTransform: 'uppercase',
+          gap: 8,
+          flexWrap: 'wrap',
         }}>
-          Impacto
+          {stageOrder >= 1 && (
+            <span style={{
+              fontSize: 9,
+              fontWeight: 700,
+              color: c.text,
+              opacity: 0.85,
+              letterSpacing: '0.3px',
+            }}>
+              {stageOrder}ª etapa
+            </span>
+          )}
+          <span style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: '#64748b',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+          }}>
+            Impacto
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {node.isMultiple && inputEdges.length > 0 && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                {inputEdges.length} {inputEdges.length === 1 ? 'entrada' : 'entradas'}
+              </span>
+            )}
+            {hasTwoInputs && (
+              <label className="nodrag" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: c.text }}>
+                <input
+                  type="checkbox"
+                  checked={!!node.isMultiple}
+                  onChange={() => updateNode(id, { isMultiple: !node.isMultiple })}
+                  aria-label="Modo múltiplo: um resultado por origem"
+                />
+                Múltiplo
+              </label>
+            )}
+          </div>
         </div>
       )}
 
@@ -417,27 +468,50 @@ export default function Card({ id, data }: NodeProps) {
         )}
 
         {node.type !== 'resultado' ? (
-          <input
-            ref={inputRef}
-            type="number"
-            value={node.value ?? 0}
-            onChange={(e) => updateNode(id, { value: parseFloat(e.target.value) || 0 })}
-            className="nodrag"
-            style={{
-              width: `${inputWidth}px`,
-              padding: '10px 16px',
-              border: `1px solid ${c.border}`,
-              borderRadius: 8,
-              fontSize: 18,
-              fontWeight: 700,
-              textAlign: 'center',
-              color: c.text,
-              background: '#ffffff',
-              MozAppearance: 'textfield',
-              WebkitAppearance: 'none',
-              appearance: 'none',
-            }}
-          />
+          node.type === 'etapa' && hasTwoInputs && secondOperandDisplay !== null && !node.isMultiple ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }} title="Segundo operando vem do outro card conectado">
+              <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>2ª entrada</span>
+              <span
+                className="nodrag"
+                style={{
+                  minWidth: 48,
+                  padding: '10px 16px',
+                  border: `1px solid ${c.border}`,
+                  borderRadius: 8,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  color: c.text,
+                  background: '#f8fafc',
+                }}
+                aria-label="Segundo operando (valor do outro card)"
+              >
+                {typeof secondOperandDisplay === 'number' ? secondOperandDisplay : secondOperandDisplay}
+              </span>
+            </div>
+          ) : (
+            <input
+              ref={inputRef}
+              type="number"
+              value={node.value ?? 0}
+              onChange={(e) => updateNode(id, { value: parseFloat(e.target.value) || 0 })}
+              className="nodrag"
+              style={{
+                width: `${inputWidth}px`,
+                padding: '10px 16px',
+                border: `1px solid ${c.border}`,
+                borderRadius: 8,
+                fontSize: 18,
+                fontWeight: 700,
+                textAlign: 'center',
+                color: c.text,
+                background: '#ffffff',
+                MozAppearance: 'textfield',
+                WebkitAppearance: 'none',
+                appearance: 'none',
+              }}
+            />
+          )
         ) : (
           <div style={{ textAlign: 'center', padding: '10px 16px' }}>
             {resultFormula && (
@@ -561,24 +635,27 @@ export default function Card({ id, data }: NodeProps) {
             
             <button
               onClick={() => addResultado(id)}
+              disabled={!canAddMoreResults}
               className="nodrag"
+              title={!canAddMoreResults ? 'Máximo de resultados = quantidade de origens (até 9)' : undefined}
               style={{
                 flex: 1,
                 padding: '8px 12px',
                 border: 'none',
-                background: c.border,
+                background: canAddMoreResults ? c.border : '#cbd5e1',
                 color: '#ffffff',
                 borderRadius: 6,
                 fontSize: 12,
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: canAddMoreResults ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 6,
+                opacity: canAddMoreResults ? 1 : 0.7,
               }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseEnter={(e) => { if (canAddMoreResults) e.currentTarget.style.opacity = '0.9' }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = canAddMoreResults ? '1' : '0.7' }}
             >
               <span>→</span> Result.
             </button>
@@ -612,8 +689,9 @@ export default function Card({ id, data }: NodeProps) {
             </button>
             
             <button
-              onClick={() => addResultado(id)}
+              onClick={() => addOrigemFromResult(id)}
               className="nodrag"
+              title="Resultado vira origem de um novo fluxo"
               style={{
                 flex: 1,
                 padding: '8px 12px',
@@ -632,7 +710,7 @@ export default function Card({ id, data }: NodeProps) {
               onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
               onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
             >
-              <span>→</span> Result.
+              <span>→</span> Origem
             </button>
           </>
         )}

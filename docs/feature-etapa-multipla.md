@@ -44,16 +44,16 @@ Lógica:
 ┌─────────────┐           ┌──────────────┐           ┌─────────────┐
 │ 🏦 Origem   │  (azul)   │ 🔄 Etapa +2  │  (azul)   │ 🎯 Result.  │
 │             │─────────► │              │─────────► │             │
-│  [3]        │           │  Múltipla    │           │  [5]        │
+│  [3]        │           │  Múltipla   │           │  [5]        │
 └─────────────┘           │              │           │ 🔗 N0       │
    (azul)                 │  1️⃣ 3 → 5    │           └─────────────┘
                           │  2️⃣ 6 → 8    │              (azul)
 ┌─────────────┐           │              │           ┌─────────────┐
 │ 🏦 Origem   │  (verde)  │              │  (verde)  │ 🎯 Result.  │
 │             │─────────► │              │─────────► │             │
-│  [6]        │           └──────────────┘           │  [8]        │
-└─────────────┘              (serrilhado)            │ 🔗 N1       │
-   (verde)                                           └─────────────┘
+│  [6]        │           │              │           │  [8]        │
+└─────────────┘           └──────────────┘           │ 🔗 N1       │
+   (verde)                     (serrilhado)          └─────────────┘
                                                         (verde)
 ```
 
@@ -197,5 +197,21 @@ Todo o contexto e raciocínio está preservado neste documento.
 ---
 
 **Data de criação:** 2026-02-15  
-**Última atualização:** 2026-02-15  
-**Autor:** Documentado durante desenvolvimento do MVP
+**Última atualização:** 2026-02-18  
+
+---
+
+## Análise de participação na funcionalidade (v1 → v2)
+
+**Conclusão: a feature melhora o produto, desde que implementada como modo distinto (não substitui o atual).**
+
+| Aspecto | Modo atual (v1) | Etapa Múltipla (feature) |
+|--------|-------------------|----------------------------|
+| Entradas | 1 ou 2 | 2 a 6 origens |
+| Saídas | 1 valor por card | N valores (1 por origem) |
+| Uso | A op B → um resultado (ex.: custo÷qtd, restante+lucro) | Aplicar mesma op a várias origens e ver cada resultado |
+| Cálculo | `input1 op input2` (input2 = 2ª aresta ou node.value) | Para cada origem: `valor_origem op node.value` → resultado próprio |
+
+- **Não atrapalha:** o comportamento atual (2 entradas → 1 saída) é necessário para fórmulas binárias (÷, + com dois cards). A feature adiciona um **modo múltipla** (`isMultiple`), com ativação automática ao conectar 2+ origens, sem remover o modo único.
+- **Melhora:** permite cenários "uma etapa, várias origens, um resultado por origem" com rastreabilidade por cor, útil para comparações e v2.0 financeira (vários capitais, mesma taxa, etc.).
+- **Recomendação:** manter no backlog para v1.5/v2.0; v1 deve permanecer estável apenas com as 4 operações e etapa binária (1 ou 2 entradas → 1 saída). Ao implementar, usar toggle/clara distinção "Modo único" vs "Múltipla" para evitar confusão.

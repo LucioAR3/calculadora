@@ -1,0 +1,25 @@
+{
+  "projectName": "Spray limpa-carros: preço e lucro",
+  "nodes": {
+    "n0": { "id": "n0", "type": "origem", "value": 1000, "title": "Capital (R$)", "position": { "x": 0, "y": 0 } },
+    "n1": { "id": "n1", "type": "etapa", "value": 600, "operation": "-", "title": "Restante", "position": { "x": 260, "y": 0 } },
+    "n2": { "id": "n2", "type": "origem", "value": 3, "title": "Caixas", "position": { "x": 0, "y": 90 } },
+    "n3": { "id": "n3", "type": "etapa", "value": 10, "operation": "×", "title": "Total sprays", "position": { "x": 260, "y": 90 } },
+    "n4": { "id": "n4", "type": "origem", "value": 600, "title": "Custo total (R$)", "position": { "x": 0, "y": 180 } },
+    "n5": { "id": "n5", "type": "etapa", "value": null, "operation": "÷", "title": "Custo por spray", "position": { "x": 260, "y": 180 } },
+    "n6": { "id": "n6", "type": "origem", "value": 25, "title": "Preço por spray (R$)", "position": { "x": 0, "y": 270 } },
+    "n7": { "id": "n7", "type": "etapa", "value": 30, "operation": "×", "title": "Receita", "position": { "x": 260, "y": 270 } },
+    "n8": { "id": "n8", "type": "etapa", "value": 600, "operation": "-", "title": "Lucro líquido", "position": { "x": 520, "y": 270 } },
+    "n9": { "id": "n9", "type": "etapa", "value": 0, "operation": "+", "title": "Capital final", "position": { "x": 520, "y": 120 } }
+  },
+  "edges": [
+    { "id": "e0", "sourceId": "n0", "targetId": "n1", "operation": "-" },
+    { "id": "e1", "sourceId": "n2", "targetId": "n3", "operation": "×" },
+    { "id": "e2", "sourceId": "n4", "targetId": "n5", "operation": "÷" },
+    { "id": "e3", "sourceId": "n3", "targetId": "n5", "operation": "÷" },
+    { "id": "e4", "sourceId": "n6", "targetId": "n7", "operation": "×" },
+    { "id": "e5", "sourceId": "n7", "targetId": "n8", "operation": "-" },
+    { "id": "e6", "sourceId": "n1", "targetId": "n9", "operation": "+" },
+    { "id": "e7", "sourceId": "n8", "targetId": "n9", "operation": "+" }
+  ]
+}
