@@ -1,18 +1,21 @@
 import { useState, useRef, useEffect } from 'react'
 import { useReactFlow, useViewport } from '@xyflow/react'
 import { useStore } from '../store'
+import type { AppMode } from '../appMode'
 
 interface Props {
+  financialEnabled: boolean
+  mode: AppMode
+  onModeChange: (mode: AppMode) => void
   onOpenCalc: () => void
+  onOpenSimulador: () => void
+  simuladorOpen: boolean
 }
 
 const ZOOM_LEVELS = [10, 25, 50, 75, 100, 150, 200, 300, 400]
 
-type AppMode = 'basico' | 'financeiro'
-
-export default function BottomToolbar({ onOpenCalc }: Props) {
+export default function BottomToolbar({ financialEnabled, mode, onModeChange, onOpenCalc, onOpenSimulador, simuladorOpen }: Props) {
   const [zoomOpen, setZoomOpen] = useState(false)
-  const [mode, setMode] = useState<AppMode>('basico')
   const zoomRef = useRef<HTMLDivElement>(null)
   const { addNode } = useStore()
   const { setViewport } = useReactFlow()
@@ -203,7 +206,7 @@ export default function BottomToolbar({ onOpenCalc }: Props) {
       {/* Modo: Básico (verde) e Financeiro (lilás) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
-          onClick={() => setMode('basico')}
+          onClick={() => onModeChange('basico')}
           title="Modo básico"
           style={{
             padding: 8,
@@ -229,29 +232,78 @@ export default function BottomToolbar({ onOpenCalc }: Props) {
         >
           α
         </button>
-        <span title="Modo financeiro">
-        <button
-          disabled
-          style={{
-            padding: 8,
-            borderRadius: 8,
-            border: 'none',
-            cursor: 'default',
-            background: 'none',
-            color: '#a855f7',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            fontSize: 18,
-            fontWeight: 700,
-            fontFamily: 'system-ui, sans-serif',
-            opacity: 0.6,
-          }}
-        >
-          π
-        </button>
-        </span>
+        {financialEnabled ? (
+          <button
+            onClick={() => onModeChange('financeiro')}
+            title="Modo financeiro"
+            style={{
+              padding: 8,
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              background: mode === 'financeiro' ? 'rgba(168, 85, 247, 0.2)' : 'none',
+              color: mode === 'financeiro' ? '#7c3aed' : '#a855f7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              fontSize: 18,
+              fontWeight: 500,
+              fontFamily: 'system-ui, sans-serif',
+            }}
+            onMouseEnter={(e) => {
+              if (mode !== 'financeiro') e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'
+            }}
+            onMouseLeave={(e) => {
+              if (mode !== 'financeiro') e.currentTarget.style.background = 'none'
+            }}
+          >
+            π
+          </button>
+        ) : (
+          <span title="Modo financeiro">
+            <button
+              disabled
+              style={{
+                padding: 8,
+                borderRadius: 8,
+                border: 'none',
+                cursor: 'default',
+                background: 'none',
+                color: '#a855f7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.2s',
+                fontSize: 18,
+                fontWeight: 500,
+                fontFamily: 'system-ui, sans-serif',
+                opacity: 0.6,
+              }}
+            >
+              π
+            </button>
+          </span>
+        )}
+        {financialEnabled && mode === 'financeiro' && !simuladorOpen && (
+          <button
+            onClick={onOpenSimulador}
+            title="Abrir simulador de juros"
+            style={{
+              padding: '6px 10px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: 'pointer',
+              background: 'rgba(168, 85, 247, 0.2)',
+              color: '#7c3aed',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'system-ui, sans-serif',
+            }}
+          >
+            Simulador
+          </button>
+        )}
       </div>
     </div>
   )

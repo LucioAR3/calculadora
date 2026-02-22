@@ -17,6 +17,8 @@ npm run build
 
 Acesse: http://localhost:5173/
 
+**Modo financeiro (simulador de juros):** desativado por padrão. Para ativar, defina `VITE_ENABLE_FINANCIAL=true` antes do build (ex.: em `.env` ou no painel da Vercel).
+
 ## 🎯 Conceito: Origem → Etapa → Destino
 
 ### Estrutura de Fluxo

@@ -1,0 +1,4 @@
+# Testes
+
+- Teste é para validar: rodar com sucesso e **remover** o(s) arquivo(s) de teste.
+- Testes **não** fazem parte da estrutura do projeto: não manter `*.test.ts` / `*.test.tsx` no repositório após validação.

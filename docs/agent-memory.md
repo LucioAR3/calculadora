@@ -21,7 +21,9 @@ etapa 2 entradas: Card mostra "2ª entrada" + valor do outro card (values[second
 
 analise lógica/evolução: docs/analise-logica-evolucao-financeira.md | compilação 2 análises fluxo, lógica etapa/resultado, entrada/saída financeiro.
 Financial Engine alinhamento: docs/financial-engine-alinhamento.md | Core Domain Calculators estrutura src/financial/; contrato mínimo juros simples; sem tocar store types UI.
+Financial Engine implementado: src/financial/ domain (contract.ts) core (interest.ts) calculators (simpleSimulator.ts) index facade. UI: appMode.ts AppMode; BottomToolbar financialEnabled mode onModeChange; SimuladorJuros.tsx consome financial. Modo financeiro oculto por padrão: featureFlags.ts isFinancialModeEnabled (VITE_ENABLE_FINANCIAL); só ativo quando flag true.
 Feature Etapa Múltipla: implementada. doc: docs/feature-etapa-multipla.md GraphNode.isMultiple; GraphEdge.flowId. store calcGraph: etapa isMultiple → apply(op, origem_i, node.value) por edge de saída (flowId ou ordem); addEdge: etapa múltipla até 9 origens e até 9 resultados (max resultados = min(origens, 9)). Card: canAddMoreResults considera limite 9. Card: toggle Múltiplo (etapa, 2+ entradas), borda dashed quando isMultiple, botão Result. desabilitado se resultados >= origens. Etapa 2 entradas sem isMultiple = binária (2→1).
 
 ## regras agente
 save: usuário pedir salvar → acrescentar em agent-memory (formato denso). pesquisar: antes de buscar no código consultar mapa; achar algo novo → acrescentar mapa. formato: otimizado para agente não para leitura usuário.
+teste: após rodar com sucesso → remover arquivo(s) de teste. teste é teste, não faz parte da estrutura do projeto.

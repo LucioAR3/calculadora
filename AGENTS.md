@@ -12,6 +12,7 @@ As regras do projeto estão em **`.cursor/rules/`** e espelham as configuraçõe
 | `07-pre-implementation.mdc` | Checklist antes de implementar (reuso, acoplamento, crédito) |
 | `08-save-memory.mdc` | Comando **save**: ao pedir, salvar raciocínio/memória em `docs/agent-memory.md` |
 | `09-search-memory-first.mdc` | **Pesquisar na memória primeiro**: consultar mapa em `docs/agent-memory.md` antes de buscar no código; mapear novas descobertas no mapa |
+| `10-tests.mdc` | **Testes**: após rodar com sucesso, remover arquivos de teste; testes não fazem parte da estrutura do projeto |
 
 ## Regras por contexto
 
