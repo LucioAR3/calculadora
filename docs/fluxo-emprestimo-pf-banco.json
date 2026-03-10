@@ -1,0 +1,27 @@
+{
+  "description": "Fluxo linear: empréstimo PF no Banco. Origin → Contract → Modifiers → Destination.",
+  "processDefinition": {
+    "origin": {
+      "id": "banco-1",
+      "name": "Banco",
+      "role": "origin"
+    },
+    "contract": {
+      "kind": "simple_interest",
+      "principal": 1000,
+      "ratePerPeriod": 0.01,
+      "periods": 12
+    },
+    "modifiers": [
+      {
+        "kind": "percent_deduction",
+        "percent": 0.38
+      }
+    ],
+    "destination": {
+      "id": "pf-1",
+      "name": "PF",
+      "role": "destination"
+    }
+  }
+}

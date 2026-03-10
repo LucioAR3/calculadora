@@ -111,3 +111,45 @@ Após sua confirmação de que este alinhamento está correto:
 3. Deixar a UI e o modo básico intocados; não ativar o botão “Modo financeiro” nem integrar ao fluxo de cards nesta fase.
 
 Se quiser ajustar escopo, nomes de camadas ou estrutura de pastas, indique antes de iniciar a implementação.
+
+---
+
+## 8. Atualização: modelo estrutural obrigatório (Modulo Financial Engine)
+
+**Objetivo:** Fluxo financeiro **linear, determinístico e isolado da UI**. Nada de grafo genérico.
+
+### 8.1 Regras que melhoram o entendimento
+
+| Regra | Significado para o usuário e para o código |
+|-------|---------------------------------------------|
+| Fluxo estritamente linear | Uma única sequência: Origin → Contract → Modifiers → Destination. Fácil de explicar e de auditar. |
+| Sem bifurcação, sem múltiplos destinos, sem split de capital | Uma entrada, uma saída. Evita ambiguidade e regras regulatórias complexas. |
+| Nenhuma lógica financeira na UI | UI só envia dados ao engine e exibe resultado. Cálculo e regras ficam em `financial/`. |
+| Core isolado, Domain sem depender de UI | Código testável; mesma entrada = mesma saída; fácil de evoluir sem quebrar a UI. |
+
+### 8.2 Conceitos obrigatórios (proposta) vs. o que temos
+
+| Conceito | Proposta | O que temos hoje | Gap |
+|----------|----------|-------------------|-----|
+| **Entity** | Participante (origem ou destino). Não calcula. | — | Falta: tipo/interface Entity (ex.: id, nome, papel: 'origin' \| 'destination'). |
+| **Contract** | Regra principal que transforma o capital (ex.: juros simples). | `SimpleInterestContract`, `CompoundInterestContract` em `domain/contract.ts`. | Alinhado. Manter; Contract = regra principal. |
+| **Modifier** | Ajuste aplicado **após** o contrato (ex.: taxa, IOF, desconto). Aplicado em sequência. | Core tem `percentOf`, `applyPercentDeduction`; **não** há tipo Modifier nem aplicação em ordem no domain. | Falta: tipo Modifier no domain; aplicação sequencial no orchestrator. |
+| **ProcessDefinition** | Objeto com `origin`, `contract`, `modifiers` (array ordenado), `destination`. | — | Falta: estrutura única que descreve o fluxo inteiro. |
+| **Orchestrator** | Recebe ProcessDefinition; cria capital inicial; aplica contrato; aplica modificadores em ordem; retorna valor final e histórico. | Calculadores atuais (`simulateSimpleInterest`, `simulateCompoundInterest`) recebem só o contrato e retornam resultado; não há “orquestração” nem histórico. | Falta: função/orquestrador que execute o pipeline linear e retorne valor final + histórico. |
+
+### 8.3 Escopo da primeira implementação (só o que melhora entendimento e uso)
+
+**Incluir apenas:**
+
+1. **Estrutura de ProcessDefinition** — tipo com `origin`, `contract`, `modifiers` (array ordenado), `destination`.
+2. **Modelos de Entity, Contract e Modifier** — no domain; sem lógica, só dados. Contract já existe; acrescentar Entity e Modifier.
+3. **Orchestrator linear** — uma função que: recebe ProcessDefinition; usa capital inicial (do origin ou do contract); aplica contract; aplica cada modifier em ordem; retorna valor final e histórico de transformações.
+4. **Simulação simples** — juros (contrato existente) + um modificador fixo (ex.: percentual sobre o montante), para validar o fluxo.
+
+**Não incluir:** grafo genérico, bifurcação, múltiplos destinos, split de capital, regras regulatórias avançadas, alteração do modo básico. Se algo fugir desse escopo, parar e revisar.
+
+### 8.4 Facilidade para o usuário
+
+- **Um único “caminho” do dinheiro:** origem → contrato → modificadores (em ordem) → destino. Fácil de ler e debugar.
+- **Histórico de transformações:** o orchestrator retorna não só o valor final mas as etapas (ex.: capital inicial → após contrato → após modifier 1 → … → valor final). A UI pode exibir esse histórico de forma simples.
+- **Determinístico:** mesma ProcessDefinition sempre dá o mesmo resultado; usuário e testes podem confiar no comportamento.

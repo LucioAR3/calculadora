@@ -1,0 +1,134 @@
+{
+  "projectName": "FIDC Florence – Indústria LTDA e 5 comerciantes",
+  "nodes": {
+    "n0": {
+      "id": "n0",
+      "type": "origem",
+      "value": 80000,
+      "title": "Maçã – recebível (R$)",
+      "position": { "x": 0, "y": 0 }
+    },
+    "n1": {
+      "id": "n1",
+      "type": "origem",
+      "value": 90000,
+      "title": "Banana – recebível (R$)",
+      "position": { "x": 0, "y": 80 }
+    },
+    "n2": {
+      "id": "n2",
+      "type": "origem",
+      "value": 70000,
+      "title": "Pera – recebível (R$)",
+      "position": { "x": 0, "y": 160 }
+    },
+    "n3": {
+      "id": "n3",
+      "type": "origem",
+      "value": 100000,
+      "title": "Uva – recebível (R$)",
+      "position": { "x": 0, "y": 240 }
+    },
+    "n4": {
+      "id": "n4",
+      "type": "origem",
+      "value": 110000,
+      "title": "Abacate – recebível (R$)",
+      "position": { "x": 0, "y": 320 }
+    },
+    "n5": {
+      "id": "n5",
+      "type": "origem",
+      "value": 0,
+      "title": "Recebível total Indústria LTDA (R$)",
+      "position": { "x": 260, "y": 160 }
+    },
+    "n6": {
+      "id": "n6",
+      "type": "etapa",
+      "value": 80,
+      "operation": "%",
+      "title": "FIDC paga 80% do recebível à Indústria LTDA",
+      "position": { "x": 520, "y": 80 }
+    },
+    "n7": {
+      "id": "n7",
+      "type": "resultado",
+      "value": null,
+      "title": "Valor pago à Indústria LTDA (R$)",
+      "position": { "x": 780, "y": 80 }
+    },
+    "n8": {
+      "id": "n8",
+      "type": "etapa",
+      "value": 20,
+      "operation": "%",
+      "title": "Desconto total assumido pela FIDC (20% do recebível)",
+      "position": { "x": 520, "y": 200 }
+    },
+    "n9": {
+      "id": "n9",
+      "type": "resultado",
+      "value": null,
+      "title": "Desconto total (R$)",
+      "position": { "x": 780, "y": 200 }
+    },
+    "n10": {
+      "id": "n10",
+      "type": "etapa",
+      "value": 40,
+      "operation": "%",
+      "title": "Parte do gerente (40% do desconto)",
+      "position": { "x": 520, "y": 320 }
+    },
+    "n11": {
+      "id": "n11",
+      "type": "resultado",
+      "value": null,
+      "title": "Comissão gerente (R$)",
+      "position": { "x": 780, "y": 320 }
+    },
+    "n12": {
+      "id": "n12",
+      "type": "etapa",
+      "value": 60,
+      "operation": "%",
+      "title": "Parte FIDC (60% do desconto)",
+      "position": { "x": 520, "y": 440 }
+    },
+    "n13": {
+      "id": "n13",
+      "type": "resultado",
+      "value": null,
+      "title": "Receita FIDC (R$)",
+      "position": { "x": 780, "y": 440 }
+    },
+    "n14": {
+      "id": "n14",
+      "type": "resultado",
+      "value": null,
+      "title": "? Riscos, prazos e formas de pagamento por comerciante",
+      "position": { "x": 780, "y": 560 }
+    }
+  },
+  "edges": [
+    { "id": "e0", "sourceId": "n0", "targetId": "n5", "operation": "+" },
+    { "id": "e1", "sourceId": "n1", "targetId": "n5", "operation": "+" },
+    { "id": "e2", "sourceId": "n2", "targetId": "n5", "operation": "+" },
+    { "id": "e3", "sourceId": "n3", "targetId": "n5", "operation": "+" },
+    { "id": "e4", "sourceId": "n4", "targetId": "n5", "operation": "+" },
+
+    { "id": "e5", "sourceId": "n5", "targetId": "n6", "operation": "%" },
+    { "id": "e6", "sourceId": "n6", "targetId": "n7", "operation": "%" },
+
+    { "id": "e7", "sourceId": "n5", "targetId": "n8", "operation": "%" },
+    { "id": "e8", "sourceId": "n8", "targetId": "n9", "operation": "%" },
+
+    { "id": "e9", "sourceId": "n9", "targetId": "n10", "operation": "%" },
+    { "id": "e10", "sourceId": "n10", "targetId": "n11", "operation": "%" },
+
+    { "id": "e11", "sourceId": "n9", "targetId": "n12", "operation": "%" },
+    { "id": "e12", "sourceId": "n12", "targetId": "n13", "operation": "%" }
+  ]
+}
+

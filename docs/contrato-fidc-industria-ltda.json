@@ -1,0 +1,88 @@
+{
+  "description": "Contrato FIDC – Indústria LTDA cede recebíveis de 5 comerciantes para FIDC Florence, com haircut de 20% e split de fee entre gerente comercial e FIDC.",
+  "fidcContract": {
+    "entities": {
+      "industry": {
+        "id": "industria-1",
+        "name": "Indústria LTDA",
+        "role": "cedente"
+      },
+      "fidc": {
+        "id": "fidc-1",
+        "name": "FIDC Florence",
+        "role": "cessionario"
+      },
+      "agent": {
+        "id": "gerente-1",
+        "name": "Gerente comercial",
+        "role": "originator"
+      },
+      "debtors": [
+        { "id": "comerc-1", "name": "Comerciante Maçã", "segment": "varejo", "role": "devedor" },
+        { "id": "comerc-2", "name": "Comerciante Banana", "segment": "varejo", "role": "devedor" },
+        { "id": "comerc-3", "name": "Comerciante Pera", "segment": "varejo", "role": "devedor" },
+        { "id": "comerc-4", "name": "Comerciante Uva", "segment": "varejo", "role": "devedor" },
+        { "id": "comerc-5", "name": "Comerciante Abacate", "segment": "varejo", "role": "devedor" }
+      ]
+    },
+    "receivables": [
+      {
+        "id": "rec-1",
+        "debtorId": "comerc-1",
+        "creditorId": "industria-1",
+        "amount": 80000,
+        "currency": "BRL",
+        "instrument": "misto",
+        "maxTermMonths": 6
+      },
+      {
+        "id": "rec-2",
+        "debtorId": "comerc-2",
+        "creditorId": "industria-1",
+        "amount": 90000,
+        "currency": "BRL",
+        "instrument": "misto",
+        "maxTermMonths": 6
+      },
+      {
+        "id": "rec-3",
+        "debtorId": "comerc-3",
+        "creditorId": "industria-1",
+        "amount": 70000,
+        "currency": "BRL",
+        "instrument": "misto",
+        "maxTermMonths": 6
+      },
+      {
+        "id": "rec-4",
+        "debtorId": "comerc-4",
+        "creditorId": "industria-1",
+        "amount": 100000,
+        "currency": "BRL",
+        "instrument": "misto",
+        "maxTermMonths": 6
+      },
+      {
+        "id": "rec-5",
+        "debtorId": "comerc-5",
+        "creditorId": "industria-1",
+        "amount": 110000,
+        "currency": "BRL",
+        "instrument": "misto",
+        "maxTermMonths": 6
+      }
+    ],
+    "economicTerms": {
+      "totalFaceValue": 450000,
+      "advancePercent": 0.8,
+      "haircutPercent": 0.2,
+      "feeSplit": {
+        "managerPercentOfTotal": 0.08,
+        "fidcPercentOfTotal": 0.12,
+        "managerPercentOfHaircut": 0.4,
+        "fidcPercentOfHaircut": 0.6
+      }
+    }
+  }
+}
+
