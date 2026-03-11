@@ -1,35 +1,46 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type CSSProperties } from 'react'
 import { useReactFlow, useViewport } from '@xyflow/react'
 import { useStore } from '../store'
-import type { AppMode } from '../appMode'
 
 interface Props {
-  financialEnabled: boolean
-  mode: AppMode
-  onModeChange: (mode: AppMode) => void
-  onOpenCalc: () => void
-  onOpenSimulador: () => void
-  simuladorOpen: boolean
+  onToggleTable: () => void
+  tableOpen: boolean
 }
 
 const ZOOM_LEVELS = [10, 25, 50, 75, 100, 150, 200, 300, 400]
 
-export default function BottomToolbar({ financialEnabled, mode, onModeChange, onOpenCalc, onOpenSimulador, simuladorOpen }: Props) {
+const dropupBtnStyle: CSSProperties = {
+  width: '100%',
+  padding: '10px 16px',
+  border: 'none',
+  background: 'none',
+  cursor: 'pointer',
+  fontSize: 13,
+  textAlign: 'left',
+  color: '#1e293b',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+}
+
+export default function BottomToolbar({ onToggleTable, tableOpen }: Props) {
   const [zoomOpen, setZoomOpen] = useState(false)
+  const [addDropupOpen, setAddDropupOpen] = useState(false)
   const zoomRef = useRef<HTMLDivElement>(null)
-  const { addNode } = useStore()
+  const addDropupRef = useRef<HTMLDivElement>(null)
+  const { addNode, updateNode, getPositionForNewFlow } = useStore()
   const { setViewport } = useReactFlow()
   const { x, y, zoom } = useViewport()
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (zoomRef.current && !zoomRef.current.contains(e.target as Node)) {
-        setZoomOpen(false)
-      }
+      const target = e.target as Node
+      if (zoomRef.current && !zoomRef.current.contains(target)) setZoomOpen(false)
+      if (addDropupRef.current && !addDropupRef.current.contains(target)) setAddDropupOpen(false)
     }
-    if (zoomOpen) document.addEventListener('click', handleClickOutside)
+    if (zoomOpen || addDropupOpen) document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
-  }, [zoomOpen])
+  }, [zoomOpen, addDropupOpen])
 
   const zoomPct = Math.round(zoom * 100)
 
@@ -39,7 +50,19 @@ export default function BottomToolbar({ financialEnabled, mode, onModeChange, on
   }
 
   const handleAddOrigem = () => {
-    addNode('origem', { x: -x / zoom + 200, y: -y / zoom + 200 })
+    addNode('origem', getPositionForNewFlow())
+    setAddDropupOpen(false)
+  }
+
+  const handleAddEtapa = () => {
+    addNode('etapa', getPositionForNewFlow())
+    setAddDropupOpen(false)
+  }
+
+  const handleAddResult = () => {
+    const id = addNode('resultado', getPositionForNewFlow())
+    updateNode(id, { title: 'Resultado' })
+    setAddDropupOpen(false)
   }
 
   return (
@@ -57,63 +80,108 @@ export default function BottomToolbar({ financialEnabled, mode, onModeChange, on
       borderRadius: 12,
       boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
     }}>
-      {/* Add Origem */}
-      <button
-        onClick={handleAddOrigem}
-        style={{
-          background: '#3b82f6',
-          color: '#ffffff',
-          border: 'none',
-          padding: '10px 20px',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          transition: 'all 0.2s',
-        }}
-        onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
-        onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M8 3v10M3 8h10" />
-        </svg>
-        Adicionar
-      </button>
+      <div ref={addDropupRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setAddDropupOpen(!addDropupOpen)}
+          style={{
+            background: addDropupOpen ? '#2563eb' : '#3b82f6',
+            color: '#ffffff',
+            border: 'none',
+            padding: '10px 20px',
+            borderRadius: 8,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
+          onMouseLeave={(e) => { if (!addDropupOpen) e.currentTarget.style.background = '#3b82f6' }}
+          title="Adicionar nó (Origem, Etapa ou Result)"
+          aria-label="Abrir menu adicionar"
+        >
+          <span style={{ fontSize: 16 }}>+</span>
+          Adicionar
+        </button>
+        {addDropupOpen && (
+          <div style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: 0,
+            marginBottom: 6,
+            background: '#fff',
+            borderRadius: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            padding: '4px 0',
+            minWidth: 160,
+            zIndex: 1100,
+          }}>
+            <button
+              type="button"
+              onClick={handleAddOrigem}
+              style={dropupBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+            >
+              <span style={{ color: '#0ea5e9' }}>●</span> Origem
+            </button>
+            <button
+              type="button"
+              onClick={handleAddEtapa}
+              style={dropupBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+            >
+              <span style={{ color: '#22c55e' }}>●</span> Etapa
+            </button>
+            <button
+              type="button"
+              onClick={handleAddResult}
+              style={dropupBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+            >
+              <span style={{ color: '#64748b' }}>→</span> Result
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* Divider */}
       <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
 
-      {/* Calculator */}
       <button
-        onClick={onOpenCalc}
+        type="button"
+        onClick={onToggleTable}
         style={{
-          background: 'none',
+          background: tableOpen ? '#e0f2fe' : 'none',
           border: 'none',
           padding: 8,
           borderRadius: 8,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          color: '#64748b',
+          justifyContent: 'center',
+          color: tableOpen ? '#0369a1' : '#64748b',
           transition: 'all 0.2s',
         }}
-        onMouseEnter={(e) => e.currentTarget.style.background = '#f1f5f9'}
-        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
-        title="Calculadora"
+        onMouseEnter={(e) => { if (!tableOpen) e.currentTarget.style.background = '#f1f5f9' }}
+        onMouseLeave={(e) => { if (!tableOpen) e.currentTarget.style.background = 'none' }}
+        title="Tabela do fluxo"
+        aria-label={tableOpen ? 'Fechar tabela do fluxo' : 'Abrir tabela do fluxo'}
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <rect x="4" y="2" width="12" height="16" rx="2" />
-          <path d="M7 5h6M7 8h2M11 8h2M7 11h2M11 11h2M7 14h2M11 14h2" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3h18v18H3z" />
+          <path d="M3 9h18" />
+          <path d="M3 15h18" />
+          <path d="M9 3v18" />
+          <path d="M15 3v18" />
         </svg>
       </button>
 
-      {/* Divider */}
       <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
 
-      {/* Zoom */}
       <div ref={zoomRef} style={{ position: 'relative' }}>
         <button
           onClick={() => setZoomOpen(!zoomOpen)}
@@ -139,10 +207,10 @@ export default function BottomToolbar({ financialEnabled, mode, onModeChange, on
             <path d="M10 10l3 3" />
           </svg>
           {zoomPct}%
-          <svg 
-            width="12" 
-            height="12" 
-            viewBox="0 0 12 12" 
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
             fill="currentColor"
             style={{
               transform: zoomOpen ? 'rotate(180deg)' : 'rotate(0)',
@@ -153,7 +221,6 @@ export default function BottomToolbar({ financialEnabled, mode, onModeChange, on
           </svg>
         </button>
 
-        {/* Zoom Dropdown */}
         {zoomOpen && (
           <div style={{
             position: 'absolute',
@@ -197,112 +264,6 @@ export default function BottomToolbar({ financialEnabled, mode, onModeChange, on
               </button>
             ))}
           </div>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
-
-      {/* Modo: Básico (verde) e Financeiro (lilás) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button
-          onClick={() => onModeChange('basico')}
-          title="Modo básico"
-          style={{
-            padding: 8,
-            borderRadius: 8,
-            border: 'none',
-            cursor: 'pointer',
-            background: mode === 'basico' ? 'rgba(34, 197, 94, 0.2)' : 'none',
-            color: mode === 'basico' ? '#16a34a' : '#22c55e',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            fontSize: 18,
-            fontWeight: 500,
-            fontFamily: 'system-ui, sans-serif',
-          }}
-          onMouseEnter={(e) => {
-            if (mode !== 'basico') e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)'
-          }}
-          onMouseLeave={(e) => {
-            if (mode !== 'basico') e.currentTarget.style.background = 'none'
-          }}
-        >
-          α
-        </button>
-        {financialEnabled ? (
-          <button
-            onClick={() => onModeChange('financeiro')}
-            title="Modo financeiro"
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              border: 'none',
-              cursor: 'pointer',
-              background: mode === 'financeiro' ? 'rgba(168, 85, 247, 0.2)' : 'none',
-              color: mode === 'financeiro' ? '#7c3aed' : '#a855f7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-              fontSize: 18,
-              fontWeight: 500,
-              fontFamily: 'system-ui, sans-serif',
-            }}
-            onMouseEnter={(e) => {
-              if (mode !== 'financeiro') e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'
-            }}
-            onMouseLeave={(e) => {
-              if (mode !== 'financeiro') e.currentTarget.style.background = 'none'
-            }}
-          >
-            π
-          </button>
-        ) : (
-          <span title="Modo financeiro">
-            <button
-              disabled
-              style={{
-                padding: 8,
-                borderRadius: 8,
-                border: 'none',
-                cursor: 'default',
-                background: 'none',
-                color: '#a855f7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s',
-                fontSize: 18,
-                fontWeight: 500,
-                fontFamily: 'system-ui, sans-serif',
-                opacity: 0.6,
-              }}
-            >
-              π
-            </button>
-          </span>
-        )}
-        {financialEnabled && mode === 'financeiro' && !simuladorOpen && (
-          <button
-            onClick={onOpenSimulador}
-            title="Abrir simulador de juros"
-            style={{
-              padding: '6px 10px',
-              borderRadius: 8,
-              border: 'none',
-              cursor: 'pointer',
-              background: 'rgba(168, 85, 247, 0.2)',
-              color: '#7c3aed',
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'system-ui, sans-serif',
-            }}
-          >
-            Simulador
-          </button>
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 export type NodeType = 'origem' | 'etapa' | 'resultado'
-export type Operation = '+' | '-' | '×' | '÷'
+export type Operation = '+' | '-' | '×' | '÷' | '%'
 
 export interface GraphNode {
   id: string

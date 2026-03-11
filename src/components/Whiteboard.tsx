@@ -13,29 +13,47 @@ import CustomEdge from './CustomEdge'
 const nodeTypes = { card: Card }
 const edgeTypes = { custom: CustomEdge }
 
+/** Viewport inicial: (0,0) no centro da tela na primeira execução. */
+function getDefaultViewport() {
+  if (typeof window === 'undefined') return { x: 0, y: 0, zoom: 1 }
+  return {
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+    zoom: 1,
+  }
+}
+
 export default function Whiteboard() {
   const { nodes, edges, updateNode, addEdge, removeEdge, removeNode, reconnectEdge } = useStore()
+  const defaultViewport = useMemo(getDefaultViewport, [])
 
   const flowNodes = useMemo(
     () => Object.values(nodes).map(n => ({
       id: n.id,
       type: 'card',
       position: n.position,
-      data: n as unknown as Record<string, unknown>,
+      data: { ...n } as Record<string, unknown>,
     })),
     [nodes]
   )
 
   const flowEdges: Edge[] = useMemo(
-    () => edges.map(e => ({
-      id: e.id,
-      source: e.sourceId,
-      target: e.targetId,
-      type: 'custom',
-      data: { operation: nodes[e.targetId]?.operation ?? e.operation },
-      reconnectable: true,
-    })),
-    [edges, nodes]
+    () => {
+      const visibleNodeIds = new Set(flowNodes.map(n => n.id))
+      return edges
+        .filter(e => visibleNodeIds.has(e.sourceId) && visibleNodeIds.has(e.targetId))
+        .map(e => ({
+          id: e.id,
+          source: e.sourceId,
+          target: e.targetId,
+          type: 'custom',
+          data: {
+            operation: nodes[e.targetId]?.operation ?? e.operation,
+          },
+          reconnectable: true,
+        }))
+    },
+    [edges, nodes, flowNodes]
   )
 
   const onConnect = useCallback(
@@ -79,7 +97,7 @@ export default function Whiteboard() {
             if (c.type === 'remove' && c.id) removeEdge(c.id)
           })
         }}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        defaultViewport={defaultViewport}
         minZoom={0.1}
         maxZoom={4}
         deleteKeyCode={['Backspace', 'Delete']}

@@ -1,9 +1,8 @@
 # Feature: Etapa Múltipla
 
-**Status:** 📋 Backlog (aguardando aprovação do MVP)  
-**Versão alvo:** v1.5 ou v2.0  
-**Complexidade:** ⭐⭐⭐ (Média-Alta)  
-**Valor UX:** ⭐⭐⭐⭐⭐
+**Status:** ✅ Implementado  
+**Versão:** presente no código (toggle "Múltiplo" no card Etapa com 2+ entradas; borda tracejada; até 9 origens/resultados).  
+*Documento mantido como referência de comportamento e design.*
 
 ## 🎯 Objetivo
 

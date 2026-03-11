@@ -2,15 +2,36 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { Position, type NodeProps } from '@xyflow/react'
 import { useStore, getStageOrderMap } from '../store'
 import type { GraphNode, Operation } from '../types'
+import { formatDecimalBR, parseDecimalBR } from '../utils/numbers'
 import CustomHandle from './CustomHandle'
 
 export default function Card({ id, data }: NodeProps) {
-  const dataNode = data as unknown as GraphNode
+  const dataNode = data as unknown as Record<string, unknown>
   const node = useStore(s => s.nodes[id] ?? dataNode) as GraphNode
-  const { updateNode, removeNode, values, addEtapa, addResultado, addOrigemFromResult, addNode, addEdge, removeAllInputs, removeAllOutputs, edges, openConfirmModal, duplicateNode, getFormula, focusNodeId, setFocusNodeId, getNextPositionFrom } = useStore()
+  const {
+    updateNode,
+    removeNode,
+    values,
+    addNode,
+    addEdge,
+    removeAllInputs,
+    removeAllOutputs,
+    edges,
+    openConfirmModal,
+    duplicateNode,
+    getFormula,
+    focusNodeId,
+    setFocusNodeId,
+    getNextPositionFrom,
+    addOrigemFromResult,
+  } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const [opMenuOpen, setOpMenuOpen] = useState(false)
+  const [addDropupOpen, setAddDropupOpen] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
+  const [inputValue, setInputValue] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
+  const addDropupRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [inputWidth, setInputWidth] = useState(80)
 
@@ -36,7 +57,15 @@ export default function Card({ id, data }: NodeProps) {
     }
   }, [node.value, node.type])
 
-  // Cores baseadas em tipo e operação
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (addDropupRef.current && !addDropupRef.current.contains(target)) setAddDropupOpen(false)
+    }
+    if (addDropupOpen) document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [addDropupOpen])
+
   const getColors = () => {
     if (node.type === 'origem') {
       return { 
@@ -66,52 +95,84 @@ export default function Card({ id, data }: NodeProps) {
         return { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af', icon: '✖️' }
       case '÷':
         return { bg: '#fed7aa', border: '#f97316', text: '#9a3412', icon: '➗' }
+      case '%':
+        return { bg: '#f5f3ff', border: '#7c3aed', text: '#5b21b6', icon: '%' }
       default:
         return { bg: '#f3f4f6', border: '#9ca3af', text: '#374151', icon: '📊' }
     }
   }
 
   const c = getColors()
-  const displayValue = node.type === 'resultado' 
+  const rawDisplayValue = node.type === 'resultado' 
     ? (values[id] ?? '—') 
     : (values[id] ?? node.value ?? 0)
+  const displayValue = typeof rawDisplayValue === 'number' ? formatDecimalBR(rawDisplayValue) : rawDisplayValue
   const resultFormula = node.type === 'resultado' ? getFormula(id) : null
 
   const inputEdges = edges.filter(e => e.targetId === id)
   const outputEdges = edges.filter(e => e.sourceId === id)
   const hasTwoInputs = inputEdges.length >= 2
-  const secondSourceId = hasTwoInputs ? inputEdges[1].sourceId : null
-  const secondOperandDisplay = hasTwoInputs && secondSourceId != null ? (values[secondSourceId] ?? '—') : null
   const isEtapaMultiple = node.type === 'etapa' && !!node.isMultiple
-  const maxOriginsMultiplo = 9
-  const canAddMoreResults = !isEtapaMultiple || outputEdges.length < Math.min(inputEdges.length, maxOriginsMultiplo)
-
+  const maxResultsMultiplo = 9
+  const canAddMoreResults = !isEtapaMultiple || outputEdges.length < Math.min(inputEdges.length, maxResultsMultiplo)
   const nodes = useStore(s => s.nodes)
   const stageOrderMap = useMemo(() => getStageOrderMap(nodes, edges), [nodes, edges])
   const stageOrder = node.type === 'etapa' ? (stageOrderMap[id] ?? 0) : 0
+
+  // Origem conectada como 2ª (ou posterior) entrada de etapa com Múltiplo desligado: visível mas inativa no cálculo
+  const isDormantOrigin = useMemo(() => {
+    if (node.type !== 'origem') return false
+    return outputEdges.some(e => {
+      const target = nodes[e.targetId]
+      if (target?.type !== 'etapa' || target.isMultiple) return false
+      const inputsToEtapa = edges.filter(x => x.targetId === e.targetId)
+      if (inputsToEtapa.length < 2) return false
+      const firstConnectedOrigin = inputsToEtapa[0].sourceId
+      return firstConnectedOrigin !== id
+    })
+  }, [node.type, node.isMultiple, id, nodes, edges, outputEdges])
 
   const handleOperationSelect = (op: Operation) => {
     updateNode(id, { operation: op })
     setOpMenuOpen(false)
   }
 
-  const handleAddOrigemLinked = () => {
-    const newPos = getNextPositionFrom(node.position)
-    const newId = addNode('origem', newPos)
+  const handleAddOrigem = () => {
+    if (node.type === 'resultado') {
+      addOrigemFromResult(id)
+    } else {
+      const newId = addNode('origem', getNextPositionFrom(node.position))
+      addEdge(id, newId)
+    }
+    setAddDropupOpen(false)
+  }
+  const handleAddEtapa = () => {
+    const newId = addNode('etapa', getNextPositionFrom(node.position))
     addEdge(id, newId)
-    setMenuOpen(false)
+    setAddDropupOpen(false)
+  }
+  const handleAddResult = () => {
+    const newId = addNode('resultado', getNextPositionFrom(node.position))
+    updateNode(newId, { title: 'Resultado' })
+    addEdge(id, newId)
+    setAddDropupOpen(false)
   }
 
   return (
-    <div style={{
+    <div
+      className="card-node"
+      style={{
       minWidth: node.type === 'resultado' ? 220 : inputWidth + 80,
-      background: c.bg,
+      background: isDormantOrigin ? '#f1f5f9' : c.bg,
       border: isEtapaMultiple ? `2px dashed ${c.border}` : `1px solid ${c.border}`,
       borderRadius: 12,
       padding: 16,
       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       position: 'relative',
-    }}>
+      opacity: isDormantOrigin ? 0.85 : 1,
+    }}
+      title={isDormantOrigin ? 'Conectada mas inativa. Ative Múltiplo na Etapa para participar do cálculo.' : undefined}
+    >
       <CustomHandle
         nodeId={id}
         type="target"
@@ -134,32 +195,36 @@ export default function Card({ id, data }: NodeProps) {
       }}>
         <span style={{ fontSize: 20 }}>{c.icon}</span>
         
-        <input
-          type="text"
-          value={node.title || ''}
-          onChange={(e) => updateNode(id, { title: e.target.value })}
-          placeholder={
-            node.type === 'origem' ? 'Origem' :
-            node.type === 'etapa' ? 'Etapa' :
-            'Resultado'
-          }
-          className="nodrag"
-          style={{
-            flex: 1,
-            border: 'none',
-            background: 'transparent',
-            fontSize: 13,
-            fontWeight: 600,
-            color: c.text,
-            outline: 'none',
-          }}
-        />
-        
-        {/* Menu 3 pontos */}
-        <div ref={menuRef} style={{ position: 'relative' }}>
+        <>
+            <input
+              type="text"
+              value={node.title || ''}
+              onChange={(e) => !isDormantOrigin && updateNode(id, { title: e.target.value })}
+              readOnly={isDormantOrigin}
+              disabled={isDormantOrigin}
+              placeholder={
+                node.type === 'origem' ? 'Origem' :
+                node.type === 'etapa' ? 'Etapa' :
+                'Resultado'
+              }
+              className="nodrag"
+              style={{
+                flex: 1,
+                border: 'none',
+                background: 'transparent',
+                fontSize: 13,
+                fontWeight: 600,
+                color: c.text,
+                outline: 'none',
+                cursor: isDormantOrigin ? 'not-allowed' : undefined,
+              }}
+            />
+            {/* Menu 3 pontos */}
+            <div ref={menuRef} style={{ position: 'relative' }}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             className="nodrag"
+            aria-label="Abrir menu do card"
             style={{
               background: 'none',
               border: 'none',
@@ -325,7 +390,8 @@ export default function Card({ id, data }: NodeProps) {
               </button>
             </div>
           )}
-        </div>
+            </div>
+          </>
       </div>
 
       {/* Label do tipo */}
@@ -341,7 +407,6 @@ export default function Card({ id, data }: NodeProps) {
           Valor Inicial
         </div>
       )}
-
       {node.type === 'etapa' && (
         <div style={{
           display: 'flex',
@@ -351,17 +416,6 @@ export default function Card({ id, data }: NodeProps) {
           gap: 8,
           flexWrap: 'wrap',
         }}>
-          {stageOrder >= 1 && (
-            <span style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: c.text,
-              opacity: 0.85,
-              letterSpacing: '0.3px',
-            }}>
-              {stageOrder}ª etapa
-            </span>
-          )}
           <span style={{
             fontSize: 10,
             fontWeight: 700,
@@ -378,18 +432,32 @@ export default function Card({ id, data }: NodeProps) {
               </span>
             )}
             {hasTwoInputs && (
-              <label className="nodrag" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: c.text }}>
-                <input
-                  type="checkbox"
-                  checked={!!node.isMultiple}
-                  onChange={() => updateNode(id, { isMultiple: !node.isMultiple })}
-                  aria-label="Modo múltiplo: um resultado por origem"
-                />
-                Múltiplo
-              </label>
+              <>
+                <label className="nodrag" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 11, fontWeight: 600, color: c.text }}>
+                  <input
+                    type="checkbox"
+                    checked={!!node.isMultiple}
+                    onChange={() => updateNode(id, { isMultiple: !node.isMultiple })}
+                    aria-label="Modo múltiplo: um resultado por origem"
+                  />
+                  Múltiplo
+                </label>
+              </>
             )}
           </div>
         </div>
+      )}
+
+      {node.type === 'etapa' && stageOrder >= 1 && (
+        <span style={{
+          fontSize: 9,
+          fontWeight: 700,
+          color: c.text,
+          opacity: 0.85,
+          letterSpacing: '0.3px',
+        }}>
+          {stageOrder}ª etapa
+        </span>
       )}
 
       {/* Content */}
@@ -438,7 +506,7 @@ export default function Card({ id, data }: NodeProps) {
                 flexDirection: 'column',
                 overflow: 'hidden',
               }}>
-                {['+', '-', '×', '÷'].map((op) => (
+                {(['+', '-', '×', '÷', '%'] as const).map((op) => (
                   <button
                     key={op}
                     onClick={() => handleOperationSelect(op as Operation)}
@@ -468,34 +536,41 @@ export default function Card({ id, data }: NodeProps) {
         )}
 
         {node.type !== 'resultado' ? (
-          node.type === 'etapa' && hasTwoInputs && secondOperandDisplay !== null && !node.isMultiple ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }} title="Segundo operando vem do outro card conectado">
-              <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>2ª entrada</span>
-              <span
-                className="nodrag"
-                style={{
-                  minWidth: 48,
-                  padding: '10px 16px',
-                  border: `1px solid ${c.border}`,
-                  borderRadius: 8,
-                  fontSize: 18,
-                  fontWeight: 700,
-                  textAlign: 'center',
-                  color: c.text,
-                  background: '#f8fafc',
-                }}
-                aria-label="Segundo operando (valor do outro card)"
-              >
-                {typeof secondOperandDisplay === 'number' ? secondOperandDisplay : secondOperandDisplay}
-              </span>
-            </div>
-          ) : (
             <input
               ref={inputRef}
-              type="number"
-              value={node.value ?? 0}
-              onChange={(e) => updateNode(id, { value: parseFloat(e.target.value) || 0 })}
+              type="text"
+              inputMode="decimal"
+              value={inputFocused ? inputValue : formatDecimalBR(node.value ?? 0)}
+              onChange={(e) => {
+                if (isDormantOrigin) return
+                const raw = e.target.value
+                if (raw !== '' && !/^-?[\d.,]*$/.test(raw)) return
+                const commaCount = (raw.match(/,/g) || []).length
+                if (commaCount > 1) return
+                const hasComma = raw.includes(',')
+                const sep = hasComma ? ',' : '.'
+                const afterSep = raw.split(sep)[1] || ''
+                if (afterSep.length > 2) return
+                setInputValue(raw)
+                const num = parseDecimalBR(raw)
+                updateNode(id, { value: Number.isNaN(num) ? 0 : num })
+              }}
+              onFocus={() => {
+                if (isDormantOrigin) return
+                setInputFocused(true)
+                setInputValue((node.value === 0 || node.value == null) ? '' : formatDecimalBR(node.value ?? 0))
+              }}
+              onBlur={() => {
+                setInputFocused(false)
+                if (isDormantOrigin) return
+                const v = inputValue.trim()
+                const num = parseDecimalBR(v)
+                updateNode(id, { value: (v === '' || Number.isNaN(num)) ? 0 : num })
+              }}
+              readOnly={isDormantOrigin}
+              disabled={isDormantOrigin}
               className="nodrag"
+              aria-label={isDormantOrigin ? 'Valor (origem inativa)' : undefined}
               style={{
                 width: `${inputWidth}px`,
                 padding: '10px 16px',
@@ -505,13 +580,13 @@ export default function Card({ id, data }: NodeProps) {
                 fontWeight: 700,
                 textAlign: 'center',
                 color: c.text,
-                background: '#ffffff',
+                background: isDormantOrigin ? '#e2e8f0' : '#ffffff',
+                cursor: isDormantOrigin ? 'not-allowed' : undefined,
                 MozAppearance: 'textfield',
                 WebkitAppearance: 'none',
                 appearance: 'none',
               }}
             />
-          )
         ) : (
           <div style={{ textAlign: 'center', padding: '10px 16px' }}>
             {resultFormula && (
@@ -536,183 +611,134 @@ export default function Card({ id, data }: NodeProps) {
         )}
       </div>
 
-      {/* Indicador de impacto para Etapa */}
-      {node.type === 'etapa' && (
-        <div style={{
-          fontSize: 16,
-          fontWeight: 'bold',
-          color: node.operation === '-' ? '#ef4444' : '#22c55e',
-          textAlign: 'right',
-          marginBottom: 12,
-        }}>
-          {node.operation === '-' ? '↓' : '↑'} {displayValue}
-        </div>
-      )}
+      {/* Indicador de impacto para Etapa + dica múltiplo acima dos botões */}
+      {node.type === 'etapa' && (() => {
+        const isNegative = node.operation === '-'
+        const impactDisplay = displayValue
+        const impactColor = isNegative ? '#ef4444' : '#22c55e'
+        const impactArrow = isNegative ? '↓' : '↑'
+        return (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginBottom: 12,
+          }}>
+            <span style={{ flex: 1, textAlign: 'left' }}>
+              {node.isMultiple && (
+                <span style={{ fontSize: 9, color: '#64748b', whiteSpace: 'nowrap' }} title="Cada origem gera um valor. Conecte um Resultado por origem para ver todos.">
+                  (1 resultado por origem)
+                </span>
+              )}
+            </span>
+            <span style={{
+              fontSize: 16,
+              fontWeight: 'bold',
+              color: impactColor,
+              textAlign: 'right',
+            }}>
+              {impactArrow} {impactDisplay}
+            </span>
+          </div>
+        )
+      })()}
 
-      {/* Botões de ação */}
-      <div style={{
-        display: 'flex',
-        gap: 8,
-        marginTop: 12,
-      }}>
-        {node.type === 'origem' && (
-          <>
-            <button
-              onClick={handleAddOrigemLinked}
-              className="nodrag"
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                background: 'rgba(59, 130, 246, 0.1)',
-                color: '#3b82f6',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'}
-            >
-              <span>+</span> Origem
-            </button>
-            
-            <button
-              onClick={() => addEtapa(id, '+')}
-              className="nodrag"
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                background: '#3b82f6',
-                color: '#ffffff',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#2563eb'}
-              onMouseLeave={(e) => e.currentTarget.style.background = '#3b82f6'}
-            >
-              <span>+</span> Add Etapa
-            </button>
-          </>
-        )}
-
-        {node.type === 'etapa' && (
-          <>
-            <button
-              onClick={() => addEtapa(id, node.operation || '+')}
-              className="nodrag"
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                background: 'rgba(0,0,0,0.05)',
-                color: c.text,
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
-            >
-              <span>+</span> Etapa
-            </button>
-            
-            <button
-              onClick={() => addResultado(id)}
-              disabled={!canAddMoreResults}
-              className="nodrag"
-              title={!canAddMoreResults ? 'Máximo de resultados = quantidade de origens (até 9)' : undefined}
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                background: canAddMoreResults ? c.border : '#cbd5e1',
-                color: '#ffffff',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: canAddMoreResults ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                opacity: canAddMoreResults ? 1 : 0.7,
-              }}
-              onMouseEnter={(e) => { if (canAddMoreResults) e.currentTarget.style.opacity = '0.9' }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = canAddMoreResults ? '1' : '0.7' }}
-            >
-              <span>→</span> Result.
-            </button>
-          </>
-        )}
-
-        {node.type === 'resultado' && (
-          <>
-            <button
-              onClick={() => addEtapa(id, '+')}
-              className="nodrag"
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                background: 'rgba(75, 85, 99, 0.1)',
-                color: '#475569',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(75, 85, 99, 0.2)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(75, 85, 99, 0.1)'}
-            >
-              <span>+</span> Etapa
-            </button>
-            
-            <button
-              onClick={() => addOrigemFromResult(id)}
-              className="nodrag"
-              title="Resultado vira origem de um novo fluxo"
-              style={{
-                flex: 1,
-                padding: '8px 12px',
-                border: 'none',
-                background: '#94a3b8',
-                color: '#ffffff',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-            >
-              <span>→</span> Origem
-            </button>
-          </>
+      <div ref={addDropupRef} style={{ position: 'relative', marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={() => setAddDropupOpen(!addDropupOpen)}
+          className="nodrag"
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: 'none',
+            background: addDropupOpen ? '#2563eb' : '#3b82f6',
+            color: '#ffffff',
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = addDropupOpen ? '#2563eb' : '#2563eb' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = addDropupOpen ? '#2563eb' : '#3b82f6' }}
+          aria-label="Adicionar nó"
+        >
+          <span>+</span> Adicionar
+        </button>
+        {addDropupOpen && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: 6,
+            background: '#fff',
+            borderRadius: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            padding: '4px 0',
+            minWidth: 140,
+            zIndex: 1100,
+          }}>
+            {!isEtapaMultiple && (
+              <>
+                {node.type === 'resultado' && (
+                  <button
+                    type="button"
+                    className="nodrag"
+                    onClick={handleAddOrigem}
+                    style={{ width: '100%', padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, textAlign: 'left', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+                  >
+                    <span style={{ color: '#0ea5e9' }}>●</span> Origem
+                  </button>
+                )}
+                {(node.type === 'origem' || node.type === 'etapa') && (
+                  <button
+                    type="button"
+                    className="nodrag"
+                    onClick={handleAddEtapa}
+                    style={{ width: '100%', padding: '10px 16px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, textAlign: 'left', color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+                  >
+                    <span style={{ color: '#22c55e' }}>●</span> Etapa
+                  </button>
+                )}
+              </>
+            )}
+            {node.type === 'etapa' && (
+              <button
+                type="button"
+                className="nodrag"
+                onClick={handleAddResult}
+                disabled={isEtapaMultiple && !canAddMoreResults}
+                title={isEtapaMultiple && !canAddMoreResults ? `Máximo de resultados = quantidade de origens (até ${maxResultsMultiplo})` : undefined}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  border: 'none',
+                  background: 'none',
+                  cursor: isEtapaMultiple && !canAddMoreResults ? 'not-allowed' : 'pointer',
+                  fontSize: 13,
+                  textAlign: 'left',
+                  color: isEtapaMultiple && !canAddMoreResults ? '#94a3b8' : '#1e293b',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  opacity: isEtapaMultiple && !canAddMoreResults ? 0.7 : 1,
+                }}
+                onMouseEnter={(e) => { if (!(isEtapaMultiple && !canAddMoreResults)) e.currentTarget.style.background = '#f8fafc' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+              >
+                <span style={{ color: '#64748b' }}>→</span> Result
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -733,6 +759,10 @@ export default function Card({ id, data }: NodeProps) {
       </div>
       
       <style>{`
+        .card-node span {
+          vertical-align: bottom;
+          text-align: left;
+        }
         input[type=number]::-webkit-outer-spin-button,
         input[type=number]::-webkit-inner-spin-button {
           -webkit-appearance: none;

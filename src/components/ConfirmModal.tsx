@@ -23,6 +23,9 @@ export default function ConfirmModal({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-modal-title"
       style={{
         position: 'fixed',
         top: 0,
@@ -67,7 +70,7 @@ export default function ConfirmModal({
           }}>
             🔥
           </div>
-          <h3 style={{
+          <h3 id="confirm-modal-title" style={{
             margin: 0,
             fontSize: 18,
             fontWeight: 600,
@@ -127,7 +130,9 @@ export default function ConfirmModal({
           justifyContent: 'flex-end',
         }}>
           <button
+            type="button"
             onClick={onClose}
+            aria-label={cancelText}
             style={{
               padding: '10px 20px',
               border: '1px solid #d1d5db',
@@ -149,10 +154,12 @@ export default function ConfirmModal({
             {cancelText}
           </button>
           <button
+            type="button"
             onClick={() => {
               onConfirm()
               onClose()
             }}
+            aria-label={confirmText}
             style={{
               padding: '10px 20px',
               border: 'none',

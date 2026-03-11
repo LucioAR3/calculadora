@@ -1,6 +1,6 @@
-# Calculadora Visual - Origem → Etapa → Destino
+# Calculadora Visual — Origem → Etapa → Resultado
 
-Aplicação web de calculadora visual interativa baseada em fluxo, inspirada em sistemas financeiros FIDC.
+Aplicação web de calculadora visual interativa baseada em fluxo (Origem → Etapa → Resultado).
 
 ## 🚀 Como Usar
 
@@ -17,27 +17,26 @@ npm run build
 
 Acesse: http://localhost:5173/
 
-**Modo financeiro (simulador de juros):** desativado por padrão. Para ativar, defina `VITE_ENABLE_FINANCIAL=true` antes do build (ex.: em `.env` ou no painel da Vercel).
-
-## 🎯 Conceito: Origem → Etapa → Destino
+## 🎯 Conceito: Origem → Etapa → Resultado
 
 ### Estrutura de Fluxo
-Baseado em aplicações financeiras profissionais, o sistema trabalha com 3 tipos de cards:
+O sistema trabalha com 3 tipos de cards:
 
-1. **🏦 Origem** - Ponto de partida
+1. **🏦 Origem** — Ponto de partida
    - Card azul claro com valor inicial
    - Representa o valor base do cálculo
    - Input dinâmico (cresce com o valor)
    - Botões: "+ Origem" e "+ Add Etapa"
 
-2. **📊 Etapa** - Transformações intermediárias
+2. **📊 Etapa** — Transformações intermediárias
    - Cards coloridos por operação (+, -, ×, ÷)
    - Input dinâmico (cresce com o valor)
    - Aplicam operações ao valor recebido
    - Mostram impacto (↑ ganho ou ↓ perda)
-   - Botões: "+ Etapa" e "→ Dest."
+   - Botões: "+ Etapa" e "→ Result." (adicionar Resultado)
+   - **Etapa múltipla:** toggle "Múltiplo" para uma etapa processar várias origens (até 9), cada uma com seu resultado.
 
-3. **🎯 Destino** - Resultado final
+3. **🎯 Resultado** (card de destino) — Resultado final
    - Card cinza com resultado calculado
    - Atualiza automaticamente
    - Representa o valor final do fluxo
@@ -81,19 +80,19 @@ Baseado em aplicações financeiras profissionais, o sistema trabalha com 3 tipo
 - Input dinâmico (ajusta ao tamanho)
 - Indicador visual (↑↓)
 - Criar nova etapa
-- Criar destino final
+- Criar resultado final
 
-### Card de Destino (🎯)
+### Card de Resultado (🎯)
 ```
 ┌─────────────────────┐
-│ 🎯 Destino          │
+│ 🎯 Resultado        │
 │                     │
 │      6000          │
 │                     │
 └─────────────────────┘
 ```
 - Resultado automático
-- Recalculo reativo
+- Recálculo reativo
 - Display grande e claro
 
 ## 📋 Exemplo de Fluxo
@@ -101,7 +100,7 @@ Baseado em aplicações financeiras profissionais, o sistema trabalha com 3 tipo
 ### Caso: 5000 + 1000 - 500 = 5500
 
 ```
-🏦 Origem      📊 Etapa (+)    📊 Etapa (-)    🎯 Destino
+🏦 Origem      📊 Etapa (+)    📊 Etapa (-)    🎯 Resultado
   5000    →      + 1000    →     - 500     →     5500
                  ↑ 6000          ↓ 5500
 ```
@@ -113,7 +112,7 @@ Baseado em aplicações financeiras profissionais, o sistema trabalha com 3 tipo
 4. Click "+ Etapa" → Nova etapa
 5. Troque operador para "-"
 6. Digite "500" → Impacto: ↓ 5500
-7. Click "→ Dest." → Resultado final: 5500
+7. Click "→ Result." → Resultado final: 5500
 
 ## 🎨 Inputs Dinâmicos
 
@@ -134,7 +133,7 @@ Todos os campos de valor (Origem e Etapa) possuem **inputs dinâmicos**:
 - ✅ Melhor uso do espaço
 - ✅ Leitura mais fácil
 
-## 🔄 Recalculo Automático
+## 🔄 Recálculo automático
 
 Altere qualquer valor na cadeia:
 - Mude origem de 5000 → 10000
@@ -185,14 +184,23 @@ Altere qualquer valor na cadeia:
 ```
 src/
 ├── App.tsx              # Root
-├── store.ts             # Zustand + Cálculos
-├── types.ts             # TypeScript types
+├── main.tsx              # Entry + CSS React Flow
+├── store.ts              # Zustand + cálculos (calcGraph, topoSort, etapa múltipla)
+├── types.ts              # GraphNode, GraphEdge, Operation
+├── appMode.ts            # Modo básico / financeiro
+├── featureFlags.ts      # isFinancialModeEnabled
+├── utils/
+│   └── numbers.ts       # to2Decimals, formatDecimalOptional
 └── components/
     ├── Whiteboard.tsx   # Canvas React Flow
-    ├── TopMenu.tsx      # Menu superior
-    ├── BottomToolbar.tsx # Toolbar inferior
-    ├── Card.tsx         # Cards (Origem/Etapa/Destino)
-    └── Calculator.tsx   # Modal calculadora
+    ├── TopMenu.tsx      # Menu superior (salvar/abrir)
+    ├── BottomToolbar.tsx # Toolbar inferior (modos, calculadora, simulador)
+    ├── Card.tsx         # Cards (Origem / Etapa / Resultado)
+    ├── Calculator.tsx   # Calculadora com precedência
+    ├── SimuladorJuros.tsx # Juros simples/compostos (modo financeiro)
+    ├── ConfirmModal.tsx # Modal excluir fluxo
+    ├── CustomEdge.tsx   # Arestas com operação
+    └── CustomHandle.tsx # Handles dos nós
 ```
 
 ### Algoritmos Implementados
@@ -218,7 +226,7 @@ src/
 |---------------|---------------------|
 | Conta FiDC | 🏦 Origem |
 | Etapas (Imposto, Taxa, etc) | 📊 Etapa (+, -, ×, ÷) |
-| Valor Líquido Final | 🎯 Destino |
+| Valor Líquido Final | 🎯 Resultado |
 | Base de Cálculo | Topological Sort |
 | Valores Monetários | Valores Numéricos |
 

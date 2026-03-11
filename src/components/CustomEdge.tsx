@@ -14,7 +14,8 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sou
   })
 
   const operation = data?.operation as string | undefined
-  
+  const isModifierTarget = data?.isModifierTarget === true
+
   // Cores baseadas na operação
   const getColor = () => {
     if (!operation) return '#cbd5e1'
@@ -23,6 +24,7 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sou
       case '-': return '#ef4444'
       case '×': return '#3b82f6'
       case '÷': return '#f97316'
+      case '%': return '#7c3aed'
       default: return '#cbd5e1'
     }
   }
@@ -31,7 +33,15 @@ export default function CustomEdge({ id, sourceX, sourceY, targetX, targetY, sou
 
   return (
     <>
-      <BaseEdge id={id} path={edgePath} style={{ stroke: color, strokeWidth: 1.5 }} />
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        style={{
+          stroke: color,
+          strokeWidth: 1.5,
+          ...(isModifierTarget && { strokeDasharray: '6 4' }),
+        }}
+      />
       
       <EdgeLabelRenderer>
         <div

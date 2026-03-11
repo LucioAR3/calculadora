@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { GraphNode, GraphEdge, Operation } from './types'
+import { to2Decimals } from './utils/numbers'
 
 interface State {
   nodes: Record<string, GraphNode>
@@ -25,9 +26,15 @@ interface State {
   loadFlow: (data: { nodes: Record<string, GraphNode>; edges: GraphEdge[] }) => void
   duplicateNode: (nodeId: string) => string | null
   getFormula: (resultNodeId: string) => string | null
+  /** Tabela unificada: headers = nomenclaturas (Origem, 1ª etapa, …, Resultado); 1 linha = 1 fluxo. */
+  getFlowTableRows: () => { headers: string[]; rows: (number | null)[][] }
   focusNodeId: string | null
   setFocusNodeId: (id: string | null) => void
   getNextPositionFrom: (basePos: { x: number; y: number }) => { x: number; y: number }
+  /** Posição para início de novo fluxo: (0,0) se vazio; senão distante do bounding box do fluxo atual. */
+  getPositionForNewFlow: () => { x: number; y: number }
+  flashMessage: { text: string } | null
+  setFlashMessage: (msg: { text: string } | null) => void
 }
 
 let nodeId = 0
@@ -74,9 +81,9 @@ const hasCycle = (edges: GraphEdge[], newSrc: string, newTgt: string): boolean =
   return false
 }
 
-// Precedência científica: × e ÷ antes de + e − (exportada para testes)
-const PRECEDENCE = { '+': 0, '-': 0, '×': 1, '÷': 1 } as const
-export type OpToken = '+' | '-' | '×' | '÷'
+// Precedência científica: ×, ÷ e % antes de + e − (exportada para testes)
+const PRECEDENCE = { '+': 0, '-': 0, '×': 1, '÷': 1, '%': 1 } as const
+export type OpToken = '+' | '-' | '×' | '÷' | '%'
 
 export const evalWithPrecedence = (tokens: (number | OpToken)[]): number | null => {
   if (tokens.length === 0) return null
@@ -101,6 +108,7 @@ export const evalWithPrecedence = (tokens: (number | OpToken)[]): number | null 
       switch (op) {
         case '×': v = a * b; break
         case '÷': v = b !== 0 ? a / b : NaN; break
+        case '%': v = a * (b / 100); break
         case '+': v = a + b; break
         case '-': v = a - b; break
         default: i += 2; continue
@@ -185,7 +193,7 @@ const topoSort = (nodes: Record<string, GraphNode>, edges: GraphEdge[]): string[
   while (queue.length > 0) {
     const node = queue.shift()!
     result.push(node)
-    
+
     graph.get(node)!.forEach(neighbor => {
       inDegree.set(neighbor, inDegree.get(neighbor)! - 1)
       if (inDegree.get(neighbor) === 0) {
@@ -193,7 +201,7 @@ const topoSort = (nodes: Record<string, GraphNode>, edges: GraphEdge[]): string[
       }
     })
   }
-  
+
   return result
 }
 
@@ -223,6 +231,8 @@ export const getStageOrderMap = (
   return depth
 }
 
+const getEffectiveValue = (n: GraphNode): number => n.value ?? 0
+
 // Calcula valores do grafo
 const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
   const result: Record<string, number | null> = {}
@@ -244,10 +254,12 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
     
     if (node.type === 'origem') {
       if (inputs.length === 0) {
-        result[nodeId] = node.value ?? 0
+        result[nodeId] = to2Decimals(getEffectiveValue(node))
       } else {
-        const vals = inputs.map(inp => result[inp.sourceId]).filter((v): v is number => v !== null && v !== undefined)
-        result[nodeId] = vals.length === 1 ? vals[0] : vals.reduce((a, b) => a + b, 0)
+        const vals = inputs
+          .map(inp => result[inp.sourceId])
+          .filter((v): v is number => v !== null && v !== undefined)
+        result[nodeId] = to2Decimals(vals.length === 1 ? vals[0]! : vals.reduce((a, b) => a + b, 0))
       }
     } else if (node.type === 'etapa') {
       if (inputs.length >= 1) {
@@ -257,37 +269,48 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
             case '-': return a - b
             case '×': return a * b
             case '÷': return b !== 0 ? a / b : null
+            case '%': return a * (b / 100)
             default: return null
           }
         }
         const op = node.operation
-        const val = node.value ?? 0
+        const val = op === '%' ? (node.value ?? 0) : getEffectiveValue(node)
 
         if (node.isMultiple && inputs.length >= 2 && op) {
-          const outEdges = edges.filter(e => e.sourceId === nodeId).sort((a, b) => a.id.localeCompare(b.id))
+          const outEdges = edges.filter(e => e.sourceId === nodeId).sort((a, b) => {
+            const posA = nodes[a.targetId]?.position ?? { x: 0, y: 0 }
+            const posB = nodes[b.targetId]?.position ?? { x: 0, y: 0 }
+            if (posA.y !== posB.y) return posA.y - posB.y
+            return posA.x - posB.x
+          })
           const sortedInputs = [...inputs].sort((a, b) => a.sourceId.localeCompare(b.sourceId))
           for (let i = 0; i < outEdges.length; i++) {
             const originId = outEdges[i].flowId ?? sortedInputs[i]?.sourceId
             const inputVal = originId != null ? result[originId] : null
             if (inputVal !== null && inputVal !== undefined) {
               const v = applyOp(inputVal, op, val)
-              if (v !== null && !Number.isNaN(v)) result[outEdges[i].targetId] = v
+              if (v !== null && !Number.isNaN(v)) result[outEdges[i].targetId] = to2Decimals(v)
             }
           }
-          const firstInput = result[sortedInputs[0]?.sourceId]
-          result[nodeId] = firstInput != null ? applyOp(firstInput, op, val) : null
+          const firstInput = sortedInputs[0]?.sourceId != null ? result[sortedInputs[0].sourceId] : null
+          const v1 = firstInput != null ? applyOp(firstInput, op, val) : null
+          result[nodeId] = v1 != null ? to2Decimals(v1) : null
         } else {
           const input1 = result[inputs[0].sourceId]
-          const input2 = inputs.length >= 2 ? result[inputs[1].sourceId] : node.value
+          const input2 = inputs.length >= 2 && node.isMultiple
+            ? result[inputs[1].sourceId]
+            : getEffectiveValue(node)
 
           if (input1 !== null && input2 !== null && op) {
-            result[nodeId] = applyOp(input1, op, input2)
+            const v = applyOp(input1, op, input2)
+            result[nodeId] = v != null ? to2Decimals(v) : null
           } else {
             result[nodeId] = null
           }
         }
       } else {
-        result[nodeId] = node.value ?? null
+        const raw = getEffectiveValue(node)
+        result[nodeId] = to2Decimals(raw)
       }
     } else if (node.type === 'resultado') {
       if (inputs.length > 0) {
@@ -299,16 +322,20 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
           const usePrecedence = node.evalPrecedence === true
           const chain = usePrecedence ? getLinearChain(nodeId, nodes, inputsMap) : null
           if (usePrecedence && chain && chain.length >= 1) {
-            const tokens: (number | OpToken)[] = [chain[0].value ?? 0]
+            const tokens: (number | OpToken)[] = [getEffectiveValue(chain[0])]
             for (let i = 1; i < chain.length; i++) {
               const etapa = chain[i]
               if (etapa.type === 'etapa' && etapa.operation) {
-                tokens.push(etapa.operation, etapa.value ?? 0)
+                const valToken = etapa.operation === '%' ? (etapa.value ?? 0) : getEffectiveValue(etapa)
+                tokens.push(etapa.operation, valToken)
               }
             }
-            result[nodeId] = tokens.length > 1 ? evalWithPrecedence(tokens) : (chain[0].value ?? null)
+            const v = tokens.length > 1 ? evalWithPrecedence(tokens) : getEffectiveValue(chain[0])
+            result[nodeId] = v != null ? to2Decimals(v) : null
           } else {
-            result[nodeId] = result[inputs[0].sourceId] ?? null
+            const srcId = inputs[0].sourceId
+            const v = result[srcId] ?? null
+            result[nodeId] = v != null ? to2Decimals(v) : null
           }
         }
       } else {
@@ -320,13 +347,23 @@ const calcGraph = (nodes: Record<string, GraphNode>, edges: GraphEdge[]) => {
   return result
 }
 
+/** Posição para início de novo fluxo: (0,0) se não há nós; senão à direita do bounding box do fluxo atual. */
+const getPositionForNewFlow = (nodes: Record<string, GraphNode>): { x: number; y: number } => {
+  const list = Object.values(nodes)
+  if (list.length === 0) return { x: 0, y: 0 }
+  const minY = Math.min(...list.map(n => n.position.y))
+  const maxX = Math.max(...list.map(n => n.position.x))
+  const OFFSET_NEW_FLOW = 380
+  return { x: maxX + OFFSET_NEW_FLOW, y: minY }
+}
+
 // Próxima posição: +300px X, +150px Y em relação ao anterior; evita sobreposição somando 150px em Y até achar espaço
 const getNextPosition = (
   nodes: Record<string, GraphNode>,
   basePos?: { x: number; y: number }
 ): { x: number; y: number } => {
   if (!basePos) {
-    return { x: 0, y: 0 }
+    return getPositionForNewFlow(nodes)
   }
   const OFFSET_X = 300
   const OFFSET_Y = 150
@@ -348,17 +385,18 @@ export const useStore = create<State>((set, get) => ({
   values: {},
   confirmModal: null,
   focusNodeId: null,
+  flashMessage: null,
 
   setFocusNodeId: (id) => set({ focusNodeId: id }),
+  setFlashMessage: (msg) => set({ flashMessage: msg }),
 
   getNextPositionFrom: (basePos) => getNextPosition(get().nodes, basePos),
+  getPositionForNewFlow: () => getPositionForNewFlow(get().nodes),
 
   addNode: (type, pos) => {
     const id = `n${nodeId++}`
     const { nodes } = get()
-    
     const position = pos || getNextPosition(nodes)
-    
     const node: GraphNode = {
       id,
       type,
@@ -366,16 +404,36 @@ export const useStore = create<State>((set, get) => ({
       position,
       ...(type === 'etapa' ? { operation: '+' as Operation } : {}),
     }
-    
     set(s => ({ nodes: { ...s.nodes, [id]: node } }))
     get().calc()
     return id
   },
 
   updateNode: (id, data) => {
-    set(s => ({
-      nodes: { ...s.nodes, [id]: { ...s.nodes[id], ...data } }
-    }))
+    const patch = { ...data }
+    if (typeof patch.value === 'number' && Number.isFinite(patch.value)) {
+      patch.value = to2Decimals(patch.value)
+    }
+    set(s => {
+      const node = s.nodes[id]
+      const updated = { ...node, ...patch } as GraphNode
+      let newEdges = s.edges
+      if (updated.type === 'etapa' && updated.isMultiple === false) {
+        const idsToRemove: string[] = []
+        const inputEdges = s.edges.filter(e => e.targetId === id).sort((a, b) => a.id.localeCompare(b.id))
+        if (inputEdges.length > 2) idsToRemove.push(...inputEdges.slice(2).map(e => e.id))
+        const outputEdges = s.edges.filter(e => e.sourceId === id).sort((a, b) => a.id.localeCompare(b.id))
+        if (outputEdges.length > 1) idsToRemove.push(...outputEdges.slice(1).map(e => e.id))
+        if (idsToRemove.length > 0) {
+          const set = new Set(idsToRemove)
+          newEdges = s.edges.filter(e => !set.has(e.id))
+        }
+      }
+      return {
+        nodes: { ...s.nodes, [id]: updated },
+        ...(newEdges !== s.edges && { edges: newEdges }),
+      }
+    })
     get().calc()
   },
 
@@ -406,7 +464,15 @@ export const useStore = create<State>((set, get) => ({
     const targetInputs = edges.filter(e => e.targetId === tgt)
     const maxInputs = targetNodeForLimit?.type === 'etapa' && targetNodeForLimit.isMultiple ? 9 : 2
     if (targetInputs.length >= maxInputs) {
-      console.warn(maxInputs === 9 ? 'Etapa múltipla: máximo 9 origens' : 'Nó já tem 2 inputs (máximo)')
+      if (targetNodeForLimit?.type === 'etapa' && maxInputs === 2) {
+        get().setFlashMessage({
+          text: 'Este card de etapa aceita no máximo duas conexões. Para conectar mais origens, ative o modo Múltiplo no card.',
+        })
+      } else if (targetNodeForLimit?.type === 'etapa' && maxInputs === 9) {
+        get().setFlashMessage({
+          text: 'Esta etapa múltipla já tem o máximo de 9 origens conectadas.',
+        })
+      }
       return
     }
 
@@ -431,9 +497,19 @@ export const useStore = create<State>((set, get) => ({
 
     let flowId: string | undefined
     if (etapaMultiple && etapaInputs.length >= 2) {
-      const used = new Set(etapaOutputs.map(e => e.flowId).filter(Boolean))
-      const nextOrigin = etapaInputs.map(e => e.sourceId).sort().find(sid => !used.has(sid))
-      flowId = nextOrigin
+      const sortedOutputs = [...etapaOutputs].sort((a, b) => {
+        const posA = nodes[a.targetId]?.position ?? { x: 0, y: 0 }
+        const posB = nodes[b.targetId]?.position ?? { x: 0, y: 0 }
+        if (posA.y !== posB.y) return posA.y - posB.y
+        return posA.x - posB.x
+      })
+      const sortedInputIds = etapaInputs.map(e => e.sourceId).sort()
+      const used = new Set<string>()
+      sortedOutputs.forEach((e, i) => {
+        const originId = e.flowId ?? sortedInputIds[i]
+        if (originId != null) used.add(originId)
+      })
+      flowId = sortedInputIds.find(sid => !used.has(sid))
     }
 
     const newEdge: GraphEdge = {
@@ -532,7 +608,7 @@ export const useStore = create<State>((set, get) => ({
     const newPos = getNextPosition(nodes, sourceNode.position)
     const newId = addNode('origem', newPos)
     const val = get().values[sourceId]
-    const numVal = typeof val === 'number' && !Number.isNaN(val) ? val : 0
+    const numVal = typeof val === 'number' && !Number.isNaN(val) ? to2Decimals(val) : 0
     updateNode(newId, { value: numVal })
     addEdge(sourceId, newId)
   },
@@ -637,9 +713,27 @@ export const useStore = create<State>((set, get) => ({
       const etapa = nodes[etapaId]
       const edge = inEdges[0]
       if (etapa?.type === 'etapa' && etapa.isMultiple && etapa.operation) {
-        const originId = edge.flowId ?? etapaId
-        const val = etapa.value ?? 0
-        return `${originId} ${etapa.operation} ${val}`
+        let originId = edge.flowId
+        if (originId == null) {
+          const outEdges = edges.filter(e => e.sourceId === etapaId).sort((a, b) => {
+            const posA = nodes[a.targetId]?.position ?? { x: 0, y: 0 }
+            const posB = nodes[b.targetId]?.position ?? { x: 0, y: 0 }
+            if (posA.y !== posB.y) return posA.y - posB.y
+            return posA.x - posB.x
+          })
+          const idx = outEdges.findIndex(e => e.targetId === resultNodeId)
+          const sortedInputs = edges.filter(e => e.targetId === etapaId).sort((a, b) => a.sourceId.localeCompare(b.sourceId))
+          originId = idx >= 0 ? sortedInputs[idx]?.sourceId : sortedInputs[0]?.sourceId
+        }
+        if (originId == null) originId = etapaId
+        return `${originId} ${etapa.operation} ${etapaId}`
+      }
+      if (etapa?.type === 'etapa' && !etapa.isMultiple && edges.filter(e => e.targetId === etapaId).length >= 2) {
+        const etapaInputs = edges.filter(e => e.targetId === etapaId).sort((a, b) => a.id.localeCompare(b.id))
+        const op = etapa.operation ?? '+'
+        const id1 = etapaInputs[0].sourceId
+        const id2 = etapaInputs[1].sourceId
+        return `${id1} ${op} ${id2}`
       }
     }
     const inputsMap = new Map<string, Array<{ sourceId: string; operation?: Operation }>>()
@@ -679,5 +773,92 @@ export const useStore = create<State>((set, get) => ({
       if (i < ops.length && ops[i]) parts.push(' ', ops[i]!, ' ')
     }
     return parts.join('').replace(/\s+/g, ' ').trim()
+  },
+
+  getFlowTableRows: () => {
+    const { nodes, edges, values } = get()
+    const resultIds = Object.values(nodes).filter(n => n.type === 'resultado').map(n => n.id)
+    const inputsMap = new Map<string, Array<{ sourceId: string; operation?: Operation }>>()
+    edges.forEach(e => {
+      if (!inputsMap.has(e.targetId)) inputsMap.set(e.targetId, [])
+      inputsMap.get(e.targetId)!.push({ sourceId: e.sourceId, operation: e.operation })
+    })
+    const outBySource = new Map<string, GraphEdge[]>()
+    edges.forEach(e => {
+      if (!outBySource.has(e.sourceId)) outBySource.set(e.sourceId, [])
+      outBySource.get(e.sourceId)!.push(e)
+    })
+
+    type Flow = { labels: string[]; values: (number | null)[]; resultId: string }
+    const flows: Flow[] = []
+    const resultIdsConsumedByMulti = new Set<string>()
+
+    // 1) Fluxos de etapa múltipla: 1 linha por origem→etapa→resultado
+    for (const rid of resultIds) {
+      if (resultIdsConsumedByMulti.has(rid)) continue
+      const inEdges = edges.filter(e => e.targetId === rid)
+      if (inEdges.length !== 1) continue
+      const etapaId = inEdges[0].sourceId
+      const etapa = nodes[etapaId]
+      if (!etapa || etapa.type !== 'etapa' || !etapa.isMultiple) continue
+      const etapaInputs = edges.filter(e => e.targetId === etapaId)
+      if (etapaInputs.length < 2) continue
+      const etapaOutputs = (outBySource.get(etapaId) ?? []).filter(e => resultIds.includes(e.targetId))
+      if (etapaOutputs.length === 0) continue
+      etapaOutputs.forEach(r => resultIdsConsumedByMulti.add(r.targetId))
+      const sortedOutputs = [...etapaOutputs].sort((a, b) => {
+        const posA = nodes[a.targetId]?.position ?? { x: 0, y: 0 }
+        const posB = nodes[b.targetId]?.position ?? { x: 0, y: 0 }
+        if (posA.y !== posB.y) return posA.y - posB.y
+        return posA.x - posB.x
+      })
+      const sortedInputIds = etapaInputs.map(e => e.sourceId).sort()
+      const labels = ['Origem', '1ª etapa', 'Resultado']
+      sortedOutputs.forEach((e, i) => {
+        const originId = e.flowId ?? sortedInputIds[i] ?? sortedInputIds[0]
+        const origem = nodes[originId]
+        const vOrigem = origem && (origem.value != null) ? origem.value : null
+        const vEtapa = etapa.value != null ? etapa.value : null
+        const vRes = values[e.targetId] ?? null
+        flows.push({ labels, values: [vOrigem, vEtapa, vRes], resultId: e.targetId })
+      })
+    }
+
+    // 2) Fluxos lineares: cada resultado não consumido vira 1 linha (Origem → 1ª etapa → … → Resultado)
+    for (const resultId of resultIds) {
+      if (resultIdsConsumedByMulti.has(resultId)) continue
+      const chain = getFormulaChain(resultId, nodes, inputsMap)
+      if (!chain || chain.length === 0) continue
+      let etapaIndex = 0
+      const labels = chain.map(node => {
+        if (node.type === 'origem') return 'Origem'
+        if (node.type === 'resultado') return 'Resultado'
+        etapaIndex += 1
+        return `${etapaIndex}ª etapa`
+      })
+      const rowValues = chain.map(node =>
+        node.type === 'resultado'
+          ? (values[node.id] ?? null)
+          : (node.value != null ? node.value : null)
+      )
+      flows.push({ labels, values: rowValues, resultId })
+    }
+
+    if (flows.length === 0) return { headers: [], rows: [] }
+    flows.sort((a, b) => {
+      const posA = nodes[a.resultId]?.position ?? { x: 0, y: 0 }
+      const posB = nodes[b.resultId]?.position ?? { x: 0, y: 0 }
+      if (posA.y !== posB.y) return posA.y - posB.y
+      return posA.x - posB.x
+    })
+    const maxCols = Math.max(...flows.map(f => f.labels.length))
+    const longest = flows.find(f => f.labels.length === maxCols) ?? flows[0]
+    const headers = longest.labels
+    const rows = flows.map(f => {
+      const len = f.values.length
+      if (len >= maxCols) return f.values.slice(0, maxCols)
+      return [...f.values.slice(0, -1), ...Array(maxCols - len).fill(null), f.values[len - 1]!]
+    })
+    return { headers, rows }
   },
 }))

@@ -1,2 +1,2 @@
-/** Modo da aplicação: básico (fluxo/calculadora) ou financeiro (simulador). */
-export type AppMode = 'basico' | 'financeiro'
+/** Modo da aplicação: apenas fluxo visual (básico). */
+export type AppMode = 'basico'

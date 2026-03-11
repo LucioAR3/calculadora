@@ -125,6 +125,7 @@ export default function TopMenu({ projectName, onNameChange }: Props) {
         
         <button
           onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="Abrir menu do projeto"
           style={{
             background: 'none',
             border: 'none',
@@ -242,7 +243,7 @@ export default function TopMenu({ projectName, onNameChange }: Props) {
         fontSize: 12,
         color: '#64748b',
       }}>
-        {Object.keys(nodes).length} cards • {edges.length} conexões
+        {Object.keys(nodes).length} cards • {edges.length} conexões • {Object.values(nodes).filter(n => n.type === 'resultado').length} fluxos
       </div>
     </div>
   )
