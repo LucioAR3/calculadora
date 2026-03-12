@@ -7,8 +7,8 @@ interface Props {
 
 export default function TabelaPanel({ onClose }: Props) {
   const getFlowTableRows = useStore(s => s.getFlowTableRows)
-  const nodes = useStore(s => s.nodes)
-  const values = useStore(s => s.values)
+  useStore(s => s.nodes)
+  useStore(s => s.values)
   const { headers, rows } = getFlowTableRows()
 
   const isEmpty = headers.length === 0
